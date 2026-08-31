@@ -1,0 +1,402 @@
+import React, { useMemo, useState } from 'react';
+import { Transaction, User } from '../types';
+import { formatMoney, normalizeDateStr } from '../lib/firebase';
+import { ChevronLeft, ChevronRight, CalendarCheck, Plus, Edit, Trash2, CheckCircle2, Sparkles } from 'lucide-react';
+import { AiOrderImportModal } from './AiOrderImportModal';
+
+interface CalendarViewProps {
+  currentDate: Date;
+  selectedDateStr: string;
+  transactions: Transaction[];
+  currentUser: User | null;
+  onSelectDate: (dateStr: string, hasData: boolean) => void;
+  onChangeMonth: (delta: number) => void;
+  onGoToToday: () => void;
+  onOpenAddModal: () => void;
+  onEditTransaction: (tx: Transaction) => void;
+  onDeleteTransaction: (id: string) => void;
+  onCompleteTransaction: (id: string) => void;
+  onImportOrders?: (orders: Transaction[]) => void;
+}
+
+export const CalendarView: React.FC<CalendarViewProps> = ({
+  currentDate,
+  selectedDateStr,
+  transactions,
+  currentUser,
+  onSelectDate,
+  onChangeMonth,
+  onGoToToday,
+  onOpenAddModal,
+  onEditTransaction,
+  onDeleteTransaction,
+  onCompleteTransaction,
+  onImportOrders
+}) => {
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [showAiModal, setShowAiModal] = useState<boolean>(false);
+
+
+  const isMerchant = currentUser?.role === 'merchant';
+  const isBuyer = currentUser?.role === 'buyer';
+
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+
+  const firstDayIndex = new Date(year, month, 1).getDay();
+  const lastDate = new Date(year, month + 1, 0).getDate();
+  const prevLastDate = new Date(year, month, 0).getDate();
+
+  // Aggregate stats per day - Memoized
+  const dayMap = useMemo(() => {
+    const map: Record<string, { count: number; expense: number; income: number }> = {};
+    for (let i = 0; i < transactions.length; i++) {
+      const t = transactions[i];
+      const d = t.date || normalizeDateStr(t.businessDate);
+      if (!d) continue;
+      if (!map[d]) {
+        map[d] = { count: 0, expense: 0, income: 0 };
+      }
+      map[d].count += 1;
+      if (t.recordType !== 'receivable') {
+        const exp = Number(t.expense) || 0;
+        const inc = Number(t.income) || 0;
+        const billed = exp > 0 ? exp : 0;
+        const paid = (exp < 0 ? Math.abs(exp) : 0) + (inc > 0 ? inc : 0);
+        map[d].expense += billed;
+        map[d].income += paid;
+      }
+    }
+    return map;
+  }, [transactions]);
+
+  // Selected Day Transactions - Memoized
+  const dayTxs = useMemo(() => {
+    return transactions.filter(t => (t.date || normalizeDateStr(t.businessDate)) === selectedDateStr);
+  }, [transactions, selectedDateStr]);
+
+  const financialDayTxs = useMemo(() => {
+    return dayTxs.filter(t => t.recordType !== 'receivable');
+  }, [dayTxs]);
+
+  const dayExpense = useMemo(() => {
+    return financialDayTxs.reduce((sum, t) => {
+      const exp = Number(t.expense) || 0;
+      return sum + (exp > 0 ? exp : 0);
+    }, 0);
+  }, [financialDayTxs]);
+
+  const dayIncome = useMemo(() => {
+    return financialDayTxs.reduce((sum, t) => {
+      const exp = Number(t.expense) || 0;
+      const inc = Number(t.income) || 0;
+      return sum + (exp < 0 ? Math.abs(exp) : 0) + (inc > 0 ? inc : 0);
+    }, 0);
+  }, [financialDayTxs]);
+
+  return (
+    <section className="flex-1 flex flex-col lg:flex-row gap-4">
+      {/* Left: Monthly Calendar Grid */}
+      <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 flex flex-col">
+        {/* Month Header & Nav */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+              {year}년 {String(month + 1).padStart(2, '0')}월
+            </h2>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => onChangeMonth(-1)}
+              className="w-8 h-8 rounded-xl hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 transition"
+              title="이전 달"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onChangeMonth(1)}
+              className="w-8 h-8 rounded-xl hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 transition"
+              title="다음 달"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={onGoToToday}
+              className="h-8 px-3 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-xs font-bold transition"
+            >
+              오늘
+            </button>
+          </div>
+        </div>
+
+        {/* Days of Week */}
+        <div className="grid grid-cols-7 gap-1 text-center font-bold text-xs py-2 border-b border-slate-200 mb-1.5">
+          <div className="text-rose-500">일</div>
+          <div className="text-slate-600">월</div>
+          <div className="text-slate-600">화</div>
+          <div className="text-slate-600">수</div>
+          <div className="text-slate-600">목</div>
+          <div className="text-slate-600">금</div>
+          <div className="text-blue-500">토</div>
+        </div>
+
+        {/* Grid Cells */}
+        <div id="calendarGrid" className="grid grid-cols-7 gap-1 sm:gap-1.5 flex-1 min-h-[340px] sm:min-h-[420px]">
+          {/* Previous month filler */}
+          {Array.from({ length: firstDayIndex }).map((_, i) => {
+            const d = prevLastDate - (firstDayIndex - 1 - i);
+            return (
+              <div key={`prev-${i}`} className="relative bg-slate-50/50 rounded-xl min-h-[56px] sm:min-h-[72px] border border-slate-100">
+                <span className="absolute top-1.5 left-1.5 font-medium text-slate-300 text-[13px] sm:text-[15px] leading-none">{d}</span>
+              </div>
+            );
+          })}
+
+          {/* Current month days */}
+          {Array.from({ length: lastDate }).map((_, i) => {
+            const d = i + 1;
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            const dayData = dayMap[dateStr] || { count: 0, expense: 0, income: 0 };
+            const isSelected = dateStr === selectedDateStr;
+            const dayOfWeek = new Date(year, month, d).getDay();
+
+            let dateColor = 'text-slate-800';
+            if (dayOfWeek === 0) dateColor = 'text-rose-600';
+            if (dayOfWeek === 6) dateColor = 'text-blue-600';
+
+            return (
+              <div
+                key={dateStr}
+                onClick={() => onSelectDate(dateStr, dayData.count > 0)}
+                className={`relative rounded-xl p-1.5 sm:p-2 min-h-[56px] sm:min-h-[72px] border transition cursor-pointer flex flex-col items-end justify-end ${
+                  isSelected
+                    ? 'bg-indigo-50 border-indigo-500 ring-2 ring-indigo-400 shadow-sm z-10'
+                    : dayData.count > 0
+                    ? 'bg-white hover:bg-slate-50 border-slate-300 shadow-xs'
+                    : 'bg-white/60 hover:bg-slate-50 border-slate-200'
+                }`}
+              >
+                <span className={`absolute top-1.5 left-1.5 font-black text-[13px] sm:text-[15px] leading-none ${dateColor}`}>
+                  {d}
+                </span>
+                
+                {dayData.count > 0 && (
+                  <span className="bg-indigo-100 text-indigo-700 text-[10px] sm:text-xs font-bold px-1.5 py-0.5 rounded-md mt-4 shadow-sm">
+                    {dayData.count}건
+                  </span>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Next month filler */}
+          {(() => {
+            const totalRendered = firstDayIndex + lastDate;
+            const nextDays = (7 - (totalRendered % 7)) % 7;
+            return Array.from({ length: nextDays }).map((_, i) => (
+              <div key={`next-${i}`} className="relative bg-slate-50/50 rounded-xl min-h-[56px] sm:min-h-[72px] border border-slate-100">
+                <span className="absolute top-1.5 left-1.5 font-medium text-slate-300 text-[13px] sm:text-[15px] leading-none">{i + 1}</span>
+              </div>
+            ));
+          })()}
+        </div>
+      </div>
+
+      {/* Right: Selected Day Details Panel */}
+      <div className="w-full lg:w-96 bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 flex flex-col gap-4">
+        {/* Day Header */}
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2">
+            <CalendarCheck className="w-5 h-5 text-indigo-600" />
+            <h3 id="selectedDateTitle" className="font-bold text-slate-800 text-sm">
+              {selectedDateStr} 사입 내역
+            </h3>
+          </div>
+          <div className="flex items-center gap-2">
+            {!isBuyer && (
+              <button
+                type="button"
+                onClick={() => setShowAiModal(true)}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1 transition shadow-sm"
+                title="AI로 텍스트에서 주문 자동 추출"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">AI 입력</span>
+              </button>
+            )}
+              <button
+                type="button"
+                id="selectedDayAddButton"
+                onClick={onOpenAddModal}
+                className="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1 transition shadow-sm"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>{isMerchant ? '주문 추가' : '신규 입력'}</span>
+              </button>
+          </div>
+        </div>
+
+        {/* Day Stat Summary */}
+        <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex justify-around text-center text-xs">
+          <div>
+            <span className="text-slate-400 block text-[11px]">대납 합계</span>
+            <span className="font-bold text-rose-600 text-sm">{formatMoney(dayExpense)}</span>
+          </div>
+          <div className="border-r border-slate-200"></div>
+          <div>
+            <span className="text-slate-400 block text-[11px]">입금 합계</span>
+            <span className="font-bold text-blue-600 text-sm">{formatMoney(dayIncome)}</span>
+          </div>
+          <div className="border-r border-slate-200"></div>
+          <div>
+            <span className="text-slate-400 block text-[11px]">주문 건수</span>
+            <span className="font-bold text-slate-800 text-sm">{dayTxs.length}건</span>
+          </div>
+        </div>
+
+        {/* Selected Day Transaction Items */}
+        <div id="dayTransactionsList" className="flex-1 overflow-y-auto space-y-2.5 max-h-[500px] pr-1">
+          {dayTxs.length === 0 ? (
+            <div className="text-center py-14 text-slate-400 text-xs">
+              <CalendarCheck className="w-8 h-8 text-slate-300 mx-auto mb-2 opacity-50" />
+              선택된 일자의 거래 내역이 없습니다.
+              <button
+                type="button"
+                onClick={onOpenAddModal}
+                className="mt-3 block mx-auto px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-sm transition"
+              >
+                + {isMerchant ? '주문 추가하기' : '주문 입력하기'}
+              </button>
+            </div>
+          ) : (
+            dayTxs.map(t => {
+              const isCompleted = (t.status || '').trim() === '완료';
+
+              return (
+                <div
+                  key={t.id}
+                  className={`p-3 rounded-xl border text-xs flex flex-col gap-1.5 transition ${
+                    isCompleted ? 'bg-emerald-50/40 border-emerald-200' : 'bg-slate-50 hover:bg-slate-100/80 border-slate-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-bold text-slate-800 text-sm">{t.store || '미지정 상호'}</span>
+                      {t.manager && (
+                        <span className="bg-indigo-100 text-indigo-800 text-[10px] px-1.5 py-0.5 rounded font-semibold">
+                          {t.manager}
+                        </span>
+                      )}
+                      {t.status && (
+                        <span
+                          className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                            isCompleted ? 'bg-emerald-200 text-emerald-800' : 'bg-slate-200 text-slate-700'
+                          }`}
+                        >
+                          {t.status}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      {isBuyer && !isCompleted && (
+                        <button
+                          type="button"
+                          onClick={() => onCompleteTransaction(t.id)}
+                          className="text-emerald-600 hover:text-emerald-800 p-1 font-bold text-[10px] flex items-center gap-0.5"
+                          title="완료 처리"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          완료
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => onEditTransaction(t)}
+                        className="text-slate-400 hover:text-indigo-600 p-1"
+                        title="수정"
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                      </button>
+                      {currentUser?.role === 'admin' && (
+                        <button
+                          type="button"
+                          onClick={() => setDeleteConfirmId(t.id)}
+                          className="text-slate-400 hover:text-rose-600 p-1"
+                          title="삭제"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="text-slate-500 text-[11px] flex items-center gap-2">
+                    <span>
+                      <b className="text-slate-700">{t.market || '-'}</b> {t.floor ? `${t.floor}층` : ''} {t.room || ''}
+                    </span>
+                    {t.region && <span className="text-slate-400">| {t.region}</span>}
+                  </div>
+
+                  <div className="flex items-center justify-between font-semibold pt-1 border-t border-slate-200/60">
+                    <span className="text-rose-600">대납: {formatMoney(t.expense)}</span>
+                    <span className="text-blue-600">입금: {formatMoney(t.income)}</span>
+                  </div>
+
+                  {t.remark && (
+                    <div className="text-[10px] text-slate-500 bg-white p-1.5 rounded-lg border border-slate-200">
+                      비고: {t.remark}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {deleteConfirmId && (
+        <div className="fixed inset-0 bg-slate-900/50 z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
+            <div className="p-6">
+              <h3 className="text-lg font-bold text-slate-800 mb-2">주문 삭제</h3>
+              <p className="text-slate-600">선택한 주문이 삭제됩니다. 삭제 하시겠습니까?</p>
+            </div>
+            <div className="flex bg-slate-50 border-t border-slate-100 p-3 gap-2">
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                className="flex-1 px-4 py-2.5 bg-white border border-slate-300 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition"
+              >
+                취소
+              </button>
+              <button
+                onClick={() => {
+                  onDeleteTransaction(deleteConfirmId);
+                  setDeleteConfirmId(null);
+                }}
+                className="flex-1 px-4 py-2.5 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 transition"
+              >
+                삭제
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {onImportOrders && (
+        <AiOrderImportModal
+          isOpen={showAiModal}
+          onClose={() => setShowAiModal(false)}
+          selectedDateStr={selectedDateStr}
+          currentUser={currentUser}
+          onImportOrders={(orders) => {
+            onImportOrders(orders);
+          }}
+        />
+      )}
+    </section>
+  );
+};

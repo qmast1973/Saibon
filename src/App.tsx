@@ -1,0 +1,912 @@
+import React, { useState, useEffect, useMemo, useCallback, useDeferredValue } from 'react';
+import * as XLSX from 'xlsx';
+import { User, Transaction, CollectionRecord, CollectionGroupRule } from './types';
+import {
+  syncFirebaseUsers,
+  syncFirebaseOrders,
+  syncFirebaseGroupRules,
+  deleteOrderFromFirebase,
+  saveOrderToFirebase,
+  firebaseSignOutUser,
+  getBusinessDate,
+  normalizeMarketName,
+  formatMoney,
+  SEED_USERS,
+  factoryResetDatabase,
+  saveOrdersBulkToFirebase,
+  normalizeDateStr,
+  getAnnouncement,
+  saveAnnouncement,
+  firestore
+} from './lib/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
+import {
+  getSessionUser,
+  setSessionUser,
+  clearSessionUser,
+  getLocalUsers,
+  saveLocalUser,
+  saveTransactionsToIndexedDB,
+  loadTransactionsFromIndexedDB,
+  loadCollections,
+  saveCollections
+} from './lib/storage';
+
+import { Navbar } from './components/Navbar';
+import { AuthScreen } from './components/AuthScreen';
+import { AdminAddModal } from './components/AdminAddModal';
+import { AdminUserManagementModal } from './components/AdminUserManagementModal';
+import { ProfileModal } from './components/ProfileModal';
+import { OrderEntryModal } from './components/OrderEntryModal';
+import { CalendarView } from './components/CalendarView';
+import { CollectionScreen } from './components/CollectionScreen';
+import { BuyerWorkdayScreen } from './components/BuyerWorkdayScreen';
+import { ExcelImportWizard } from './components/ExcelImportWizard';
+import { LocalMerchantInfoModal } from './components/LocalMerchantInfoModal';
+import { GroupRulesManagerModal } from './components/GroupRulesManagerModal';
+import { DataManagementModal } from './components/DataManagementModal';
+import { AnnouncementModal, AnnouncementBanner } from './components/AnnouncementComponents';
+import { Search } from 'lucide-react';
+
+export default function App() {
+  // Global Data State
+  const [users, setUsers] = useState<User[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [collections, setCollections] = useState<CollectionRecord[]>([]);
+  const [collectionGroupRules, setCollectionGroupRules] = useState<CollectionGroupRule[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
+
+  // App Navigation & Selection State
+  const [selectedDateStr, setSelectedDateStr] = useState<string>(getBusinessDate());
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+
+  // Filter State (Search Only)
+  const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearchQuery = useDeferredValue(searchQuery);
+
+  // Modal State
+  const [showAdminAddModal, setShowAdminAddModal] = useState(false);
+  const [showAdminUserManagementModal, setShowAdminUserManagementModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [profileTargetUsername, setProfileTargetUsername] = useState<string | null>(null);
+  const [showOrderModal, setShowOrderModal] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [showCollectionScreen, setShowCollectionScreen] = useState(false);
+  const [showBuyerWorkdayScreen, setShowBuyerWorkdayScreen] = useState(false);
+  const [showMerchantInfoModal, setShowMerchantInfoModal] = useState(false);
+  const [showGroupRulesModal, setShowGroupRulesModal] = useState(false);
+  const [showDataManagementModal, setShowDataManagementModal] = useState(false);
+  const [pendingExcelRows, setPendingExcelRows] = useState<any[] | null>(null);
+  const [announcement, setAnnouncement] = useState<string>('');
+  const [showAnnouncementPopup, setShowAnnouncementPopup] = useState<boolean>(false);
+  const [isEditingAnnouncement, setIsEditingAnnouncement] = useState<boolean>(false);
+  const [editAnnouncementText, setEditAnnouncementText] = useState<string>('');
+
+  // Pre-normalize transaction records helper
+  const cleanTransactions = useCallback((txs: Transaction[]): Transaction[] => {
+    return txs
+      .map(t => ({
+        ...t,
+        date: normalizeDateStr(t.date || t.businessDate || ''),
+        market: normalizeMarketName(t.market || ''),
+        expense: Number(t.expense) || 0,
+        income: Number(t.income) || 0
+      }))
+      .filter(t => {
+        const hasStore = t.store && t.store.trim() !== '';
+        const hasExpense = t.expense !== 0;
+        const hasIncome = t.income !== 0;
+        return hasStore || hasExpense || hasIncome;
+      });
+  }, []);
+
+  const setCleanTransactions = useCallback((txs: Transaction[]) => {
+    setTransactions(cleanTransactions(txs));
+  }, [cleanTransactions]);
+
+  // 1. Initial Local Storage & Session Setup
+  useEffect(() => {
+    async function init() {
+      // Background fetch announcement without blocking
+      getAnnouncement().then(initialAnnouncement => {
+        if (initialAnnouncement) setAnnouncement(initialAnnouncement);
+      }).catch(() => {});
+      
+      try {
+        const docRef = doc(firestore, 'settings', 'announcement');
+        onSnapshot(docRef, (snap) => {
+          if (snap.exists()) {
+            setAnnouncement(snap.data().text || '');
+          }
+        }, (err) => {
+          console.warn('onSnapshot error (likely offline):', err.message);
+        });
+      } catch (e) {}
+
+      try {
+        const [cachedUser, localUsers, cachedTxs, cachedCollections] = await Promise.all([
+          getSessionUser(),
+          getLocalUsers(),
+          loadTransactionsFromIndexedDB(),
+          Promise.resolve(loadCollections())
+        ]);
+
+        if (cachedUser) {
+          setCurrentUser(cachedUser);
+          if (cachedUser.role === 'buyer') {
+            setShowBuyerWorkdayScreen(true);
+          } else if (cachedUser.role === 'merchant') {
+            setShowOrderModal(true);
+          }
+        }
+
+        if (localUsers.length > 0) {
+          // Ensure seed users are also available in local list
+          const merged = [...localUsers];
+          SEED_USERS.forEach(su => {
+            if (!merged.some(u => u.username === su.username)) {
+              merged.push(su);
+              saveLocalUser(su).catch(() => {});
+            }
+          });
+          setUsers(merged);
+        } else {
+          setUsers(SEED_USERS);
+          for (const su of SEED_USERS) {
+            saveLocalUser(su).catch(() => {});
+          }
+        }
+
+        if (cachedTxs.length > 0) {
+          setCleanTransactions(cachedTxs);
+        } else {
+          setTransactions([]);
+        }
+
+        if (cachedCollections.length > 0) {
+          setCollections(cachedCollections);
+        }
+      } catch (e) {
+        console.warn('Init error:', e);
+      }
+      setIsInitializing(false);
+    }
+    init();
+  }, [cleanTransactions, setCleanTransactions]);
+
+  // 2. Real-time Firebase Sync Listeners
+  useEffect(() => {
+    const unsubUsers = syncFirebaseUsers((firebaseUsers) => {
+      if (firebaseUsers.length > 0) {
+        setUsers(firebaseUsers);
+        firebaseUsers.forEach(u => saveLocalUser(u));
+
+        // Keep currentUser updated with latest permissions/approval
+        if (currentUser) {
+          const fresh = firebaseUsers.find(u => u.username === currentUser.username);
+          if (fresh) {
+            setCurrentUser(fresh);
+            setSessionUser(fresh);
+          }
+        }
+      }
+    });
+
+    const unsubOrders = syncFirebaseOrders((firebaseOrders) => {
+      setCleanTransactions(firebaseOrders);
+      saveTransactionsToIndexedDB(firebaseOrders);
+    });
+
+    const unsubRules = syncFirebaseGroupRules((rules) => {
+      setCollectionGroupRules(rules);
+    });
+
+    return () => {
+      unsubUsers();
+      unsubOrders();
+      unsubRules();
+    };
+  }, [currentUser?.username, setCleanTransactions]);
+
+  // Handle Login & Logout
+  const handleLoginSuccess = async (user: User) => {
+    if (announcement.trim()) {
+      setShowAnnouncementPopup(true);
+    }
+    setCurrentUser(user);
+    await setSessionUser(user);
+    if (user.role === 'buyer') {
+      setShowBuyerWorkdayScreen(true);
+    } else if (user.role === 'merchant') {
+      setShowOrderModal(true);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await firebaseSignOutUser();
+    } catch (e) {
+      console.warn('Firebase logout warning:', e);
+    }
+    await clearSessionUser();
+    setCurrentUser(null);
+    setShowBuyerWorkdayScreen(false);
+  };
+
+  // Role-based visibility base
+  const roleFilteredTransactions = useMemo(() => {
+    if (currentUser?.role === 'admin' || !currentUser) {
+      return transactions;
+    }
+
+    const allowedMarkets = (currentUser?.role === 'buyer' && currentUser.allowedMarkets)
+      ? new Set((currentUser.allowedMarkets || []).map(normalizeMarketName))
+      : null;
+
+    let assignedUsernames: string[] = [];
+    let assignedStores = new Set<string>();
+    
+    if (currentUser?.role === 'local') {
+      assignedUsernames = currentUser.assignedMerchants || [];
+      assignedStores = new Set(
+        users.filter(u => assignedUsernames.includes(u.username) && u.storeName)
+             .map(u => u.storeName as string)
+      );
+    }
+
+    return transactions.filter(t => {
+      if (currentUser?.role === 'merchant') {
+        const isOwner = t.merchantId === currentUser.username || t.store === currentUser.storeName;
+        if (!isOwner) return false;
+      }
+
+      if (currentUser?.role === 'buyer') {
+        if (allowedMarkets && allowedMarkets.size > 0 && !allowedMarkets.has(t.market)) {
+          return false;
+        }
+      }
+
+      if (currentUser?.role === 'local') {
+        const isAssigned = 
+          assignedUsernames.includes(t.merchantId || '') || 
+          (t.store && assignedStores.has(t.store));
+        if (!isAssigned) return false;
+      }
+
+      return true;
+    });
+  }, [transactions, currentUser, users]);
+
+  // Memoized distinct values for dropdowns & filters
+  const allMarkets: string[] = useMemo(() => ([...new Set([
+    ...roleFilteredTransactions.map(t => t.market),
+    'APM', '디오트', '청평', '테크노', '플레이스', '남평', '더블유', '아트', '신평', '유어스', '제평', '누죤', '럭스', '맥스', '퀸즈', '킹'
+  ])].filter(Boolean) as string[]).sort((a, b) => a.localeCompare(b, 'ko')), [roleFilteredTransactions]);
+
+  const stores: string[] = useMemo(() => ([...new Set(roleFilteredTransactions.map(t => t.store).filter(Boolean))] as string[]).sort((a, b) => a.localeCompare(b, 'ko')), [roleFilteredTransactions]);
+
+  const availableRegions: string[] = useMemo(() => {
+    const reg = ([...new Set(roleFilteredTransactions.map(t => t.region).filter(Boolean))] as string[]).sort((a, b) => a.localeCompare(b, 'ko'));
+    if (!reg.includes('합성동')) reg.unshift('합성동');
+    return reg;
+  }, [roleFilteredTransactions]);
+
+  const managers: string[] = useMemo(() => ([...new Set([
+    ...users.filter(u => u.role === 'buyer' || u.role === 'local').map(u => u.name),
+    ...roleFilteredTransactions.map(t => t.manager)
+  ])].filter(Boolean) as string[]).sort((a, b) => a.localeCompare(b, 'ko')), [users, roleFilteredTransactions]);
+
+  // Memoized Filtering Logic (Search Only)
+  const filteredTransactions = useMemo(() => {
+    const q = deferredSearchQuery.trim().toLowerCase();
+    if (!q) return roleFilteredTransactions;
+
+    return roleFilteredTransactions.filter(t => {
+      const combined = `${t.store} ${t.manager} ${t.market} ${t.region} ${t.status} ${t.remark}`.toLowerCase();
+      return combined.includes(q);
+    });
+  }, [roleFilteredTransactions, deferredSearchQuery]);
+
+  // Month navigation
+  const handleChangeMonth = (delta: number) => {
+    const next = new Date(currentDate.getFullYear(), currentDate.getMonth() + delta, 1);
+    setCurrentDate(next);
+  };
+
+  const handleGoToToday = () => {
+    const todayStr = getBusinessDate();
+    setSelectedDateStr(todayStr);
+    const [y, m] = todayStr.split('-').map(Number);
+    setCurrentDate(new Date(y, m - 1, 1));
+  };
+
+  // Transaction Actions
+  const handleOpenAddModal = () => {
+    setEditingTransaction(null);
+    setShowOrderModal(true);
+  };
+
+  const handleEditTransaction = (tx: Transaction) => {
+    setEditingTransaction(tx);
+    setShowOrderModal(true);
+  };
+
+  const handleDeleteTransaction = async (id: string) => {
+    const target = transactions.find(t => t.id === id);
+    const updated = transactions.filter(t => t.id !== id);
+    setTransactions(updated);
+    await saveTransactionsToIndexedDB(updated);
+    if (target) {
+      await deleteOrderFromFirebase(target);
+    }
+  };
+
+  const handleToggleComplete = async (id: string) => {
+    let targetTx: Transaction | undefined;
+    const updated = transactions.map(t => {
+      if (t.id === id) {
+        const isComp = (t.status || '').trim() === '완료';
+        targetTx = { ...t, status: isComp ? '' : '완료' };
+        return targetTx;
+      }
+      return t;
+    });
+    setTransactions(updated);
+    await saveTransactionsToIndexedDB(updated);
+    if (targetTx) {
+      try {
+        await saveOrderToFirebase(targetTx);
+      } catch (e) {
+        console.warn('Firebase sync on toggle complete error:', e);
+      }
+    }
+  };
+
+  const handleCompleteTransaction = async (id: string) => {
+    let targetTx: Transaction | undefined;
+    const updated = transactions.map(t => {
+      if (t.id === id) {
+        targetTx = { ...t, status: '완료' };
+        return targetTx;
+      }
+      return t;
+    });
+    setTransactions(updated);
+    await saveTransactionsToIndexedDB(updated);
+    if (targetTx) {
+      try {
+        await saveOrderToFirebase(targetTx);
+      } catch (e) {
+        console.warn('Firebase sync on complete error:', e);
+      }
+    }
+  };
+
+  // Excel Handlers
+  const handleExcelExport = () => {
+    if (transactions.length === 0) {
+      alert('내보낼 데이터가 없습니다.');
+      return;
+    }
+
+    const rows = [
+      ['날짜', '담당자', '지역', '상호', '건물명', '층', '호수', '대납금', '입금액', '상태', '비고']
+    ];
+
+    transactions.forEach(t => {
+      rows.push([
+        t.date || '',
+        t.manager || '',
+        t.region || '',
+        t.store || '',
+        t.market || '',
+        t.floor || '',
+        t.room || '',
+        String(t.expense || 0),
+        String(t.income || 0),
+        t.status || '',
+        t.remark || ''
+      ]);
+    });
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, '합성동사입원장');
+    XLSX.writeFile(wb, `사입ON_정산장부_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
+  const handleExcelImport = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames.find(n => /주문|사입|원장|내역|Sheet1|data/i.test(n)) || workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const rawJson: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+        if (rawJson.length < 2) {
+          alert('가져올 데이터가 없습니다.');
+          return;
+        }
+
+        // Find the best header row within first 10 rows
+        const keywords = ['날짜', '일자', '일시', '담당', '삼촌', '상호', '거래처', '매장', '건물', '시장', '상가', '층', '호수', '호', '대납', '지출', '금액', '입금', '수금', '상태', '비고', '메모'];
+        let bestHeaderRowIndex = 0;
+        let maxMatches = -1;
+
+        for (let r = 0; r < Math.min(10, rawJson.length); r++) {
+          const row = rawJson[r] || [];
+          let matches = 0;
+          row.forEach(cell => {
+            const cellStr = String(cell || '').replace(/\s+/g, '');
+            if (keywords.some(k => cellStr.includes(k))) {
+              matches++;
+            }
+          });
+          if (matches > maxMatches) {
+            maxMatches = matches;
+            bestHeaderRowIndex = r;
+          }
+        }
+
+        const headers = rawJson[bestHeaderRowIndex] || [];
+        const findIdx = (kws: string[], def = -1) => {
+          for (const k of kws) {
+            const idx = headers.findIndex(h => String(h).replace(/\s+/g, '').toLowerCase().includes(k.toLowerCase()));
+            if (idx >= 0) return idx;
+          }
+          return def;
+        };
+
+        const idx = {
+          date: findIdx(['날짜', '일자', '주문일', '일시', 'date'], 0),
+          manager: findIdx(['담당', '담당자', '사입삼촌', '삼촌', '사입자', 'manager'], 1),
+          region: findIdx(['지역', '합성동', '소속', '지점', 'region'], 2),
+          store: findIdx(['상호', '소매상호', '거래처', '매장', '가게', '소매', 'store'], 3),
+          market: findIdx(['건물', '시장', '상가', '건물명', '도매', 'market'], 4),
+          floor: findIdx(['층', '층수', 'floor'], 5),
+          room: findIdx(['호수', '호', 'room'], 6),
+          expense: findIdx(['대납', '대납금', '대납액', '지출', '사입금', '금액', '합계', 'expense'], 7),
+          income: findIdx(['입금', '입금액', '수금', '수금액', 'income'], -1),
+          status: findIdx(['상태', '완료', '진행', '구분', '완료여부', 'status'], -1),
+          remark: findIdx(['비고', '메모', '특이사항', '내용', 'remark', 'memo'], -1)
+        };
+
+        let curDate = selectedDateStr;
+        let curManager = '';
+        let curRegion = '합성동';
+
+        const parsed = rawJson.slice(bestHeaderRowIndex + 1).map((r, i) => {
+          const rawDate = r[idx.date];
+          const normalizedDate = normalizeDateStr(rawDate, '');
+          if (normalizedDate) curDate = normalizedDate;
+
+          const mgrVal = String(r[idx.manager] || '').trim();
+          if (mgrVal) curManager = mgrVal;
+          const regVal = String(r[idx.region] || '').trim();
+          if (regVal) curRegion = regVal;
+
+          return {
+            date: curDate,
+            sourceManager: curManager,
+            region: curRegion,
+            store: String(r[idx.store] || '').trim(),
+            market: normalizeMarketName(r[idx.market]),
+            floor: String(r[idx.floor] || '').trim(),
+            room: String(r[idx.room] || '').trim(),
+            expense: Number(String(r[idx.expense] || '0').replace(/,/g, '')) || 0,
+            income: idx.income >= 0 ? Number(String(r[idx.income] || '0').replace(/,/g, '')) || 0 : 0,
+            status: idx.status >= 0 ? String(r[idx.status] || '').trim() : '',
+            remark: idx.remark >= 0 ? String(r[idx.remark] || '').trim() : ''
+          };
+        }).filter(r => {
+          const hasStore = r.store.trim() !== '';
+          const hasExpense = r.expense !== 0;
+          const hasIncome = r.income !== 0;
+          return hasStore || hasExpense || hasIncome;
+        });
+
+        if (parsed.length === 0) {
+          alert('가져올 수 있는 유효한 데이터 행을 찾을 수 없습니다. 엑셀 열 구성을 확인해주세요.');
+          return;
+        }
+
+        setPendingExcelRows(parsed);
+      } catch (err: any) {
+        console.error('엑셀 파싱 오류:', err);
+        alert('엑셀 파일을 읽는 중 오류가 발생했습니다.');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const handleInitializeData = async () => {
+    if (currentUser?.role !== 'admin') {
+      alert('관리자만 초기화할 수 있습니다.');
+      return;
+    }
+    
+    const confirmMsg = '⚠️ [데이터 공장 초기화]\n\n실사용을 위해 서버의 모든 장부 및 수금 데이터를 영구 삭제하시겠습니까?\n이 작업은 취소할 수 없으며, 모든 사용자의 데이터가 지워집니다.';
+    if (confirm(confirmMsg)) {
+      try {
+        await factoryResetDatabase();
+        setTransactions([]);
+        setCollections([]);
+        saveTransactionsToIndexedDB([]);
+        saveCollections([]);
+        alert('모든 거래 및 수금 데이터가 완벽하게 초기화되었습니다.');
+      } catch (e) {
+        console.error('초기화 실패:', e);
+        alert('데이터 초기화 중 오류가 발생했습니다.');
+      }
+    }
+  };
+
+  // DB Backup & Restore
+  const handleBackupDB = () => {
+    const payload = {
+      format: 'SAIPON_FULL_BACKUP',
+      version: 2,
+      exportedAt: new Date().toISOString(),
+      transactions,
+      users,
+      collections,
+      collectionGroupRules
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `사입ON_DB_백업_${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleRestoreDB = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const payload = JSON.parse(e.target?.result as string);
+        if (!payload.transactions) {
+          throw new Error('백업 파일 형식이 아닙니다.');
+        }
+
+        if (confirm('현재 DB를 백업 파일 내용으로 복원하시겠습니까?')) {
+          setTransactions(payload.transactions);
+          await saveTransactionsToIndexedDB(payload.transactions);
+          await saveOrdersBulkToFirebase(payload.transactions);
+
+          if (payload.collections) {
+            setCollections(payload.collections);
+            saveCollections(payload.collections);
+          }
+
+          if (payload.collectionGroupRules) {
+            setCollectionGroupRules(payload.collectionGroupRules);
+          }
+
+          alert('데이터가 성공적으로 복원되었습니다.');
+        }
+      } catch (err: any) {
+        alert('DB 복원 실패: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center">
+        <div className="text-center space-y-2">
+          <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-xs text-slate-500 font-semibold">사입ON 데이터를 불러오는 중...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If not logged in, show AuthScreen
+  if (!currentUser) {
+    return (
+      <>
+        <AuthScreen
+          users={users}
+          availableRegions={availableRegions}
+          onLoginSuccess={handleLoginSuccess}
+          onOpenAdminAdd={() => setShowAdminAddModal(true)}
+        />
+        {showAdminAddModal && (
+          <AdminAddModal
+            users={users}
+            currentUser={currentUser}
+            onClose={() => setShowAdminAddModal(false)}
+            onAdminCreated={(admin) => {
+              setUsers(prev => [...prev.filter(u => u.username !== admin.username), admin]);
+            }}
+          />
+        )}
+      </>
+    );
+  }
+
+  return (
+    <div className="bg-slate-100 text-slate-800 min-h-screen flex flex-col antialiased">
+      {/* Top Navbar */}
+      <Navbar
+        currentUser={currentUser}
+        onOpenDataManagement={() => setShowDataManagementModal(true)}
+        onOpenProfile={() => {
+          setProfileTargetUsername(currentUser.username);
+          setShowProfileModal(true);
+        }}
+        onOpenMerchantInfo={() => setShowMerchantInfoModal(true)}
+        onOpenCollectionScreen={() => setShowCollectionScreen(true)}
+        onOpenBuyerWorkday={() => setShowBuyerWorkdayScreen(true)}
+        onOpenAdminManagement={() => setShowAdminUserManagementModal(true)}
+        onLogout={handleLogout}
+      />
+
+      {/* Main Content Area */}
+      <main className="max-w-7xl w-full mx-auto p-3 flex-1 flex flex-col gap-3">
+        <AnnouncementBanner announcement={announcement} currentUser={currentUser} onSave={saveAnnouncement} />
+        {/* Search Bar */}
+        <section className="bg-white p-2 sm:p-2.5 rounded-2xl shadow-xs border border-slate-200 flex items-center justify-between gap-2.5 text-xs">
+          <div className="relative flex-1 max-w-md">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="상호, 건물, 비고, 담당자 검색..."
+              className="border border-slate-300 rounded-xl pl-8 pr-3 py-1.5 bg-slate-50 w-full outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white text-xs"
+            />
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
+          </div>
+
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="text-slate-500 hover:text-indigo-600 font-semibold text-xs px-2 py-1 rounded-lg hover:bg-slate-100 transition shrink-0"
+            >
+              검색 초기화
+            </button>
+          )}
+        </section>
+
+        {/* Primary View: Calendar */}
+        <CalendarView
+          currentDate={currentDate}
+          selectedDateStr={selectedDateStr}
+          transactions={filteredTransactions}
+          currentUser={currentUser}
+          onSelectDate={(dateStr, hasData) => {
+            setSelectedDateStr(dateStr);
+            if (!hasData && currentUser.role === 'merchant') {
+              handleOpenAddModal();
+            }
+          }}
+          onChangeMonth={handleChangeMonth}
+          onGoToToday={handleGoToToday}
+          onOpenAddModal={handleOpenAddModal}
+          onEditTransaction={handleEditTransaction}
+          onDeleteTransaction={handleDeleteTransaction}
+          onCompleteTransaction={handleCompleteTransaction}
+          onImportOrders={(newOrders) => {
+            setCleanTransactions([...transactions, ...newOrders]);
+          }}
+        />
+      </main>
+
+      {/* Modals */}
+      {showAdminAddModal && (
+        <AdminAddModal
+          users={users}
+          currentUser={currentUser}
+          onClose={() => setShowAdminAddModal(false)}
+          onAdminCreated={(admin) => {
+            setUsers(prev => [...prev.filter(u => u.username !== admin.username), admin]);
+          }}
+        />
+      )}
+
+      {showAdminUserManagementModal && (
+        <AdminUserManagementModal
+          users={users}
+          currentUser={currentUser}
+          onClose={() => setShowAdminUserManagementModal(false)}
+          onOpenProfile={(uName) => {
+            setProfileTargetUsername(uName);
+            setShowProfileModal(true);
+          }}
+          onOpenAdminAdd={() => setShowAdminAddModal(true)}
+          onUserDeleted={(username) => {
+            setUsers(prev => prev.filter(u => u.username !== username));
+          }}
+        />
+      )}
+
+      {showProfileModal && profileTargetUsername && (
+        <ProfileModal
+          username={profileTargetUsername}
+          users={users}
+          currentUser={currentUser}
+          allMarkets={allMarkets}
+          availableRegions={availableRegions}
+          onClose={() => {
+            setShowProfileModal(false);
+            setProfileTargetUsername(null);
+          }}
+          onUserSaved={(updatedUser) => {
+            setUsers(prev => prev.map(u => u.username === updatedUser.username ? updatedUser : u));
+            if (updatedUser.username === currentUser?.username) {
+              setCurrentUser(updatedUser);
+            }
+          }}
+        />
+      )}
+
+      {showOrderModal && (
+        <OrderEntryModal
+          editingTransaction={editingTransaction}
+          currentUser={currentUser}
+          selectedDate={selectedDateStr}
+          stores={stores}
+          allMarkets={allMarkets}
+          onClose={() => {
+            setShowOrderModal(false);
+            setEditingTransaction(null);
+          }}
+          onOrderSaved={(savedOrders) => {
+            const savedIds = new Set(savedOrders.map(t => t.id));
+            const updated = [
+              ...savedOrders,
+              ...transactions.filter(t => !savedIds.has(t.id))
+            ];
+            setTransactions(updated);
+            saveTransactionsToIndexedDB(updated);
+          }}
+          onOrderCompleted={handleCompleteTransaction}
+        />
+      )}
+
+      {showCollectionScreen && (
+        <CollectionScreen
+          transactions={roleFilteredTransactions}
+          collections={collections}
+          currentUser={currentUser}
+          users={users}
+          collectionGroupRules={collectionGroupRules}
+          onClose={() => setShowCollectionScreen(false)}
+          onSaveCollection={(col) => {
+            const updated = [col, ...collections];
+            setCollections(updated);
+            saveCollections(updated);
+          }}
+          onOpenGroupManager={() => setShowGroupRulesModal(true)}
+                    onResetCollectionData={() => {
+            setCollections([]);
+            saveCollections([]);
+          }}
+          onResetAllData={() => setShowDataManagementModal(true)}
+          onOpenOrderDetail={(id) => {
+            const tx = transactions.find(t => t.id === id);
+            if (tx) handleEditTransaction(tx);
+          }}
+          onToggleComplete={handleToggleComplete}
+        />
+      )}
+
+      {showDataManagementModal && (
+        <DataManagementModal
+          currentUser={currentUser}
+          transactions={transactions}
+          onClose={() => setShowDataManagementModal(false)}
+          onExcelImport={handleExcelImport}
+          onExcelExport={handleExcelExport}
+          onBackupDB={handleBackupDB}
+          onRestoreDB={handleRestoreDB}
+          onResetComplete={() => {
+            setTransactions([]);
+            setCollections([]);
+          }}
+          onResetCollectionsOnly={() => {
+            setCollections([]);
+          }}
+        />
+      )}
+
+      {showBuyerWorkdayScreen && (currentUser?.role === 'buyer' || currentUser?.role === 'admin') && (
+        <BuyerWorkdayScreen
+          announcement={announcement}
+          onSaveAnnouncement={saveAnnouncement}
+          currentUser={currentUser}
+          transactions={roleFilteredTransactions}
+          selectedDateStr={selectedDateStr}
+          onSelectDateStr={setSelectedDateStr}
+          onLogout={handleLogout}
+          onStartEnteringOrder={() => setShowBuyerWorkdayScreen(false)}
+          onOpenAddOrder={() => setShowOrderModal(true)}
+          onOpenOrder={handleEditTransaction}
+          onTransactionsUpdated={(updated) => {
+            setTransactions(updated);
+            saveTransactionsToIndexedDB(updated);
+          }}
+        />
+      )}
+
+      {showMerchantInfoModal && (
+        <LocalMerchantInfoModal
+          currentUser={currentUser}
+          users={users}
+          onClose={() => setShowMerchantInfoModal(false)}
+        />
+      )}
+
+      {showGroupRulesModal && (
+        <GroupRulesManagerModal
+          rules={collectionGroupRules}
+          currentUser={currentUser}
+          currentDateStr={selectedDateStr}
+          onClose={() => setShowGroupRulesModal(false)}
+          onRulesUpdated={setCollectionGroupRules}
+        />
+      )}
+
+      {pendingExcelRows && (
+        <ExcelImportWizard
+          parsedRows={pendingExcelRows}
+          users={users}
+          onClose={() => setPendingExcelRows(null)}
+          onImportFinalized={async (imported) => {
+            if (!imported || imported.length === 0) {
+              setPendingExcelRows(null);
+              return;
+            }
+
+            // Remove wiped flag so sync doesn't clear
+            localStorage.removeItem('SAIPON_DATA_INITIALIZED');
+
+            const existingIds = new Set(transactions.map(t => t.id));
+            const newOnes = imported.filter(t => !existingIds.has(t.id));
+            const updated = [...newOnes, ...transactions];
+            
+            setTransactions(updated);
+            await saveTransactionsToIndexedDB(updated);
+
+            // Persist bulk orders to Firebase
+            // Do not block UI for Firebase sync
+            saveOrdersBulkToFirebase(newOnes).catch(err => {
+              console.warn('Firebase bulk save warning:', err);
+            });
+
+            // Auto-navigate to the latest date among imported items
+            const dates = imported.map(t => normalizeDateStr(t.date || t.businessDate)).filter(Boolean).sort((a, b) => b.localeCompare(a));
+            if (dates.length > 0) {
+              const latestDate = dates[0];
+              setSelectedDateStr(latestDate);
+              const parts = latestDate.split('-');
+              if (parts.length === 3) {
+                const y = parseInt(parts[0], 10);
+                const m = parseInt(parts[1], 10) - 1;
+                const d = parseInt(parts[2], 10);
+                if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+                  setCurrentDate(new Date(y, m, d));
+                }
+              }
+            }
+
+            setPendingExcelRows(null);
+            alert(`엑셀 불러오기가 완료되었습니다!\n총 ${newOnes.length}건이 등록되었으며, 해당 데이터가 위치한 날짜(${dates[0] || '선택일'})로 화면이 이동되었습니다.`);
+          }}
+        />
+      )}
+
+      <AnnouncementModal isOpen={showAnnouncementPopup} onClose={() => setShowAnnouncementPopup(false)} announcement={announcement} />
+    </div>
+  );
+}
+// Force update for publish button: Mon Aug 31 03:27:26 AM UTC 2026
+// Verify GitHub sync status: Mon Aug 31 03:57:11 AM UTC 2026
