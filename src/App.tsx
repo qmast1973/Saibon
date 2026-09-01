@@ -4,11 +4,11 @@ import { User, Transaction, CollectionRecord, CollectionGroupRule } from './type
 import {
   syncFirebaseUsers,
   syncFirebaseOrders,
-  syncFirebaseGroupRules,
-  deleteOrderFromFirebase,
+    deleteOrderFromFirebase,
   saveOrderToFirebase,
   firebaseSignOutUser,
   getBusinessDate,
+  checkOrderTimeAllowed,
   normalizeMarketName,
   formatMoney,
   SEED_USERS,
@@ -17,6 +17,8 @@ import {
   normalizeDateStr,
   getAnnouncement,
   saveAnnouncement,
+  getMarkets,
+  saveMarkets,
   firestore
 } from './lib/firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -39,12 +41,15 @@ import { AdminUserManagementModal } from './components/AdminUserManagementModal'
 import { ProfileModal } from './components/ProfileModal';
 import { OrderEntryModal } from './components/OrderEntryModal';
 import { CalendarView } from './components/CalendarView';
+
 import { CollectionScreen } from './components/CollectionScreen';
+import { GroupRulesManagerModal } from './components/GroupRulesManagerModal';
+
 import { BuyerWorkdayScreen } from './components/BuyerWorkdayScreen';
 import { ExcelImportWizard } from './components/ExcelImportWizard';
 import { LocalMerchantInfoModal } from './components/LocalMerchantInfoModal';
-import { GroupRulesManagerModal } from './components/GroupRulesManagerModal';
 import { DataManagementModal } from './components/DataManagementModal';
+import { BuildingManagerModal } from './components/BuildingManagerModal';
 import { AnnouncementModal, AnnouncementBanner } from './components/AnnouncementComponents';
 import { Search } from 'lucide-react';
 
@@ -52,9 +57,7 @@ export default function App() {
   // Global Data State
   const [users, setUsers] = useState<User[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [collections, setCollections] = useState<CollectionRecord[]>([]);
-  const [collectionGroupRules, setCollectionGroupRules] = useState<CollectionGroupRule[]>([]);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+      const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
 
   // App Navigation & Selection State
@@ -72,11 +75,17 @@ export default function App() {
   const [profileTargetUsername, setProfileTargetUsername] = useState<string | null>(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+    const [showBuyerWorkdayScreen, setShowBuyerWorkdayScreen] = useState(false);
+
+  const [collections, setCollections] = useState<CollectionRecord[]>([]);
+  const [collectionGroupRules, setCollectionGroupRules] = useState<CollectionGroupRule[]>([]);
   const [showCollectionScreen, setShowCollectionScreen] = useState(false);
-  const [showBuyerWorkdayScreen, setShowBuyerWorkdayScreen] = useState(false);
-  const [showMerchantInfoModal, setShowMerchantInfoModal] = useState(false);
   const [showGroupRulesModal, setShowGroupRulesModal] = useState(false);
-  const [showDataManagementModal, setShowDataManagementModal] = useState(false);
+
+  const [showMerchantInfoModal, setShowMerchantInfoModal] = useState(false);
+    const [showDataManagementModal, setShowDataManagementModal] = useState(false);
+  const [showBuildingManagerModal, setShowBuildingManagerModal] = useState(false);
+  const [fetchedMarkets, setFetchedMarkets] = useState<string[]>(['APM', 'APM 럭스', 'APM 플레이스', '팀204', '디자이너', '누죤', '골든상가', '샤넬 마네킹', '대일 마네킹', '에소르', '누누', '유어스', '벨포스트', '퀸즈', '광희', '제일평화', '맥스타일', '신평화', '남평화', '동평화', '아트', '더블유 스튜디오', '해양', '동원', '테크노', '청평화', '신발상가', '디오트', '픽대지', '상상', '자판', '남대', '세로나', '포키', '원', '시티', '페인트', '부르뎅', '마마', '웅이', '화이트', '탑', '크레용', '키즈', '팀엔드']);
   const [pendingExcelRows, setPendingExcelRows] = useState<any[] | null>(null);
   const [announcement, setAnnouncement] = useState<string>('');
   const [showAnnouncementPopup, setShowAnnouncementPopup] = useState<boolean>(false);
@@ -111,6 +120,10 @@ export default function App() {
       // Background fetch announcement without blocking
       getAnnouncement().then(initialAnnouncement => {
         if (initialAnnouncement) setAnnouncement(initialAnnouncement);
+      }).catch(() => {});
+
+      getMarkets().then(m => {
+        if (m && m.length > 0) setFetchedMarkets(m);
       }).catch(() => {});
       
       try {
@@ -165,7 +178,6 @@ export default function App() {
         }
 
         if (cachedCollections.length > 0) {
-          setCollections(cachedCollections);
         }
       } catch (e) {
         console.warn('Init error:', e);
@@ -198,15 +210,11 @@ export default function App() {
       saveTransactionsToIndexedDB(firebaseOrders);
     });
 
-    const unsubRules = syncFirebaseGroupRules((rules) => {
-      setCollectionGroupRules(rules);
-    });
 
     return () => {
       unsubUsers();
       unsubOrders();
-      unsubRules();
-    };
+          };
   }, [currentUser?.username, setCleanTransactions]);
 
   // Handle Login & Logout
@@ -278,11 +286,11 @@ export default function App() {
     });
   }, [transactions, currentUser, users]);
 
+
   // Memoized distinct values for dropdowns & filters
   const allMarkets: string[] = useMemo(() => ([...new Set([
-    ...roleFilteredTransactions.map(t => t.market),
-    'APM', '디오트', '청평', '테크노', '플레이스', '남평', '더블유', '아트', '신평', '유어스', '제평', '누죤', '럭스', '맥스', '퀸즈', '킹'
-  ])].filter(Boolean) as string[]).sort((a, b) => a.localeCompare(b, 'ko')), [roleFilteredTransactions]);
+    ...fetchedMarkets
+  ])].filter(m => Boolean(m) && !['미수금', '결산', '회식비', '식대', '식비', '경비', '입금'].includes(m.trim())) as string[]), [fetchedMarkets]);
 
   const stores: string[] = useMemo(() => ([...new Set(roleFilteredTransactions.map(t => t.store).filter(Boolean))] as string[]).sort((a, b) => a.localeCompare(b, 'ko')), [roleFilteredTransactions]);
 
@@ -323,6 +331,7 @@ export default function App() {
 
   // Transaction Actions
   const handleOpenAddModal = () => {
+    if (currentUser?.role !== 'admin' && !checkOrderTimeAllowed()) return;
     setEditingTransaction(null);
     setShowOrderModal(true);
   };
@@ -367,7 +376,7 @@ export default function App() {
     let targetTx: Transaction | undefined;
     const updated = transactions.map(t => {
       if (t.id === id) {
-        targetTx = { ...t, status: '완료' };
+        targetTx = { ...t, status: '주문찾기' };
         return targetTx;
       }
       return t;
@@ -533,8 +542,7 @@ export default function App() {
       try {
         await factoryResetDatabase();
         setTransactions([]);
-        setCollections([]);
-        saveTransactionsToIndexedDB([]);
+                saveTransactionsToIndexedDB([]);
         saveCollections([]);
         alert('모든 거래 및 수금 데이터가 완벽하게 초기화되었습니다.');
       } catch (e) {
@@ -552,8 +560,6 @@ export default function App() {
       exportedAt: new Date().toISOString(),
       transactions,
       users,
-      collections,
-      collectionGroupRules
     };
 
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -579,14 +585,7 @@ export default function App() {
           await saveTransactionsToIndexedDB(payload.transactions);
           await saveOrdersBulkToFirebase(payload.transactions);
 
-          if (payload.collections) {
-            setCollections(payload.collections);
-            saveCollections(payload.collections);
-          }
 
-          if (payload.collectionGroupRules) {
-            setCollectionGroupRules(payload.collectionGroupRules);
-          }
 
           alert('데이터가 성공적으로 복원되었습니다.');
         }
@@ -638,13 +637,26 @@ export default function App() {
       <Navbar
         currentUser={currentUser}
         onOpenDataManagement={() => setShowDataManagementModal(true)}
+          onOpenBuildingManagement={() => setShowBuildingManagerModal(true)}
         onOpenProfile={() => {
           setProfileTargetUsername(currentUser.username);
           setShowProfileModal(true);
         }}
         onOpenMerchantInfo={() => setShowMerchantInfoModal(true)}
-        onOpenCollectionScreen={() => setShowCollectionScreen(true)}
-        onOpenBuyerWorkday={() => setShowBuyerWorkdayScreen(true)}
+        onOpenCollectionScreen={() => {
+          if (roleFilteredTransactions.length > 0) {
+            const maxDate = roleFilteredTransactions.map(t => t.date).sort().reverse()[0];
+            if (maxDate) setSelectedDateStr(maxDate);
+          }
+          setShowCollectionScreen(true);
+        }}
+        onOpenBuyerWorkday={() => {
+          if (roleFilteredTransactions.length > 0) {
+            const maxDate = roleFilteredTransactions.map(t => t.date).sort().reverse()[0];
+            if (maxDate) setSelectedDateStr(maxDate);
+          }
+          setShowBuyerWorkdayScreen(true);
+        }}
         onOpenAdminManagement={() => setShowAdminUserManagementModal(true)}
         onLogout={handleLogout}
       />
@@ -748,6 +760,70 @@ export default function App() {
         />
       )}
 
+      
+      {showCollectionScreen && (
+        <CollectionScreen
+          initialDate={selectedDateStr}
+          transactions={roleFilteredTransactions}
+          collections={collections}
+          currentUser={currentUser}
+          users={users}
+          collectionGroupRules={collectionGroupRules}
+          onClose={() => setShowCollectionScreen(false)}
+          onOpenGroupManager={() => setShowGroupRulesModal(true)}
+          onResetCollectionData={() => {
+            if (confirm('수금 데이터를 초기화하시겠습니까?')) {
+              setCollections([]);
+              saveCollections([]);
+            }
+          }}
+          onResetAllData={handleInitializeData}
+          onOpenOrderDetail={(id) => {
+            const found = transactions.find(t => t.id === id);
+            if (found) {
+              setEditingTransaction(found);
+              setShowOrderModal(true);
+            }
+          }}
+          onToggleComplete={handleCompleteTransaction}
+          onSaveCollection={async (col) => {
+            const updated = [col, ...collections];
+            setCollections(updated);
+            saveCollections(updated);
+            
+            // 또한 입금 거래 내역(Transaction)으로도 반영하여 장부와 수금 현황이 일치되도록 동기화
+            const depositTx: Transaction = {
+              id: col.id || `col_tx_${Date.now()}`,
+              date: col.date,
+              businessDate: col.date,
+              market: '입금',
+              store: col.store,
+              localManager: col.localManager,
+              income: col.amount,
+              expense: 0,
+              remark: col.note ? `수금 (${col.note})` : '수금',
+              type: '입금',
+              status: '완료',
+              createdAt: new Date().toISOString()
+            };
+            const updatedTx = [depositTx, ...transactions];
+            setTransactions(updatedTx);
+            await saveTransactionsToIndexedDB(updatedTx);
+            await saveOrdersBulkToFirebase([depositTx]);
+          }}
+        />
+      )}
+
+      {showGroupRulesModal && (
+        <GroupRulesManagerModal
+          rules={collectionGroupRules}
+          currentUser={currentUser}
+          currentDateStr={selectedDateStr}
+          onClose={() => setShowGroupRulesModal(false)}
+          onRulesUpdated={setCollectionGroupRules}
+        />
+      )}
+
       {showOrderModal && (
         <OrderEntryModal
           editingTransaction={editingTransaction}
@@ -772,30 +848,12 @@ export default function App() {
         />
       )}
 
-      {showCollectionScreen && (
-        <CollectionScreen
-          transactions={roleFilteredTransactions}
-          collections={collections}
-          currentUser={currentUser}
-          users={users}
-          collectionGroupRules={collectionGroupRules}
-          onClose={() => setShowCollectionScreen(false)}
-          onSaveCollection={(col) => {
-            const updated = [col, ...collections];
-            setCollections(updated);
-            saveCollections(updated);
-          }}
-          onOpenGroupManager={() => setShowGroupRulesModal(true)}
-                    onResetCollectionData={() => {
-            setCollections([]);
-            saveCollections([]);
-          }}
-          onResetAllData={() => setShowDataManagementModal(true)}
-          onOpenOrderDetail={(id) => {
-            const tx = transactions.find(t => t.id === id);
-            if (tx) handleEditTransaction(tx);
-          }}
-          onToggleComplete={handleToggleComplete}
+      
+
+      {showBuildingManagerModal && (
+        <BuildingManagerModal
+          onClose={() => setShowBuildingManagerModal(false)}
+          onMarketsUpdated={(m) => setFetchedMarkets(m)}
         />
       )}
 
@@ -810,18 +868,14 @@ export default function App() {
           onRestoreDB={handleRestoreDB}
           onResetComplete={() => {
             setTransactions([]);
-            setCollections([]);
-          }}
+                      }}
           onResetCollectionsOnly={() => {
-            setCollections([]);
-          }}
+                      }}
         />
       )}
 
       {showBuyerWorkdayScreen && (currentUser?.role === 'buyer' || currentUser?.role === 'admin') && (
         <BuyerWorkdayScreen
-          announcement={announcement}
-          onSaveAnnouncement={saveAnnouncement}
           currentUser={currentUser}
           transactions={roleFilteredTransactions}
           selectedDateStr={selectedDateStr}
@@ -845,15 +899,7 @@ export default function App() {
         />
       )}
 
-      {showGroupRulesModal && (
-        <GroupRulesManagerModal
-          rules={collectionGroupRules}
-          currentUser={currentUser}
-          currentDateStr={selectedDateStr}
-          onClose={() => setShowGroupRulesModal(false)}
-          onRulesUpdated={setCollectionGroupRules}
-        />
-      )}
+      
 
       {pendingExcelRows && (
         <ExcelImportWizard
@@ -910,3 +956,4 @@ export default function App() {
 }
 // Force update for publish button: Mon Aug 31 03:27:26 AM UTC 2026
 // Verify GitHub sync status: Mon Aug 31 03:57:11 AM UTC 2026
+// Force update for z-index: Mon Aug 31 06:13:55 AM UTC 2026

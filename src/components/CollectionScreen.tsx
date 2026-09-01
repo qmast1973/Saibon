@@ -11,11 +11,12 @@ interface CollectionScreenProps {
   collectionGroupRules: CollectionGroupRule[];
   onClose: () => void;
   onSaveCollection: (collection: CollectionRecord) => void;
-  onOpenGroupManager: () => void;
-    onResetCollectionData: () => void;
-  onResetAllData: () => void;
-  onOpenOrderDetail: (id: string) => void;
+  onOpenGroupManager?: () => void;
+  onResetCollectionData?: () => void;
+  onResetAllData?: () => void;
+  onOpenOrderDetail?: (id: string) => void;
   onToggleComplete?: (id: string) => void;
+  initialDate?: string;
 }
 
 export const CollectionScreen: React.FC<CollectionScreenProps> = ({
@@ -27,13 +28,14 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
   onClose,
   onSaveCollection,
   onOpenGroupManager,
-    onResetCollectionData,
+  onResetCollectionData,
   onResetAllData,
   onOpenOrderDetail,
-  onToggleComplete
+  onToggleComplete,
+  initialDate
 }) => {
-  const [dateFilter, setDateFilter] = useState('');
-  const [hasAutoSetDate, setHasAutoSetDate] = useState(false);
+  const [dateFilter, setDateFilter] = useState(initialDate || '');
+  const [hasAutoSetDate, setHasAutoSetDate] = useState(!!initialDate);
 
   const [storeFilter, setStoreFilter] = useState('');
   const [buyerFilter, setBuyerFilter] = useState('');
@@ -126,8 +128,8 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
   }, [ledgerRows]);
 
   const totalOrderCount = useMemo(() => orderRows.length, [orderRows]);
-  const completedOrderCount = useMemo(() => orderRows.filter(t => (t.status || '').trim() === '완료').length, [orderRows]);
-  const unprocessedOrderCount = useMemo(() => orderRows.filter(t => (t.status || '').trim() !== '완료').length, [orderRows]);
+  const completedOrderCount = useMemo(() => orderRows.filter(t => (t.status || '').trim() !== '').length, [orderRows]);
+  const unprocessedOrderCount = useMemo(() => orderRows.filter(t => (t.status || '').trim() === '').length, [orderRows]);
 
   // Extract unique Seoul Buyer Uncles (사입삼촌들)
   const buyerList = useMemo(() => {
@@ -303,30 +305,36 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
           <div className="flex items-center gap-2 flex-wrap">
             {isAdmin && (
               <>
-                <button
-                  type="button"
-                  onClick={onOpenGroupManager}
-                  className="px-3 py-2 rounded-xl bg-violet-700 hover:bg-violet-600 text-white text-xs font-bold transition flex items-center gap-1"
-                >
-                  <Layers className="w-3.5 h-3.5" />
-                  대표 거래처 관리
-                </button>
+                {onOpenGroupManager && (
+                  <button
+                    type="button"
+                    onClick={onOpenGroupManager}
+                    className="px-3 py-2 rounded-xl bg-violet-700 hover:bg-violet-600 text-white text-xs font-bold transition flex items-center gap-1"
+                  >
+                    <Layers className="w-3.5 h-3.5" />
+                    대표 거래처 관리
+                  </button>
+                )}
                 
-                <button
-                  type="button"
-                  onClick={onResetCollectionData}
-                  className="px-3 py-2 rounded-xl bg-rose-700 hover:bg-rose-600 text-white text-xs font-bold transition flex items-center gap-1"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  수금 초기화
-                </button>
-                <button
-                  type="button"
-                  onClick={onResetAllData}
-                  className="px-3 py-2 rounded-xl bg-red-900 hover:bg-red-800 text-white text-xs font-bold transition"
-                >
-                  전체 주문 초기화
-                </button>
+                {onResetCollectionData && (
+                  <button
+                    type="button"
+                    onClick={onResetCollectionData}
+                    className="px-3 py-2 rounded-xl bg-rose-700 hover:bg-rose-600 text-white text-xs font-bold transition flex items-center gap-1"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    수금 초기화
+                  </button>
+                )}
+                {onResetAllData && (
+                  <button
+                    type="button"
+                    onClick={onResetAllData}
+                    className="px-3 py-2 rounded-xl bg-red-900 hover:bg-red-800 text-white text-xs font-bold transition"
+                  >
+                    전체 주문 초기화
+                  </button>
+                )}
               </>
             )}
             <button
@@ -341,22 +349,22 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
         </div>
 
         {/* 4 Metric Cards: 총 대납금, 총 주문건수, 완료건수, 미처리 건수 */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-            <div className="text-[11px] text-slate-500 font-semibold">총 대납금</div>
-            <div className="font-bold text-lg sm:text-xl text-rose-600 mt-1 font-mono">{formatMoney(totalBilled)}</div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="bg-white rounded-xl border border-slate-200 p-2 shadow-sm">
+            <div className="text-[10px] text-slate-500 font-semibold">총 대납금</div>
+            <div className="font-bold text-sm sm:text-base text-rose-600 mt-0.5 font-mono">{formatMoney(totalBilled)}</div>
           </div>
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-            <div className="text-[11px] text-slate-500 font-semibold">총 주문건수</div>
-            <div className="font-bold text-lg sm:text-xl text-slate-900 mt-1 font-mono">{totalOrderCount}건</div>
+          <div className="bg-white rounded-xl border border-slate-200 p-2 shadow-sm">
+            <div className="text-[10px] text-slate-500 font-semibold">총 주문건수</div>
+            <div className="font-bold text-sm sm:text-base text-slate-900 mt-0.5 font-mono">{totalOrderCount}건</div>
           </div>
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-            <div className="text-[11px] text-slate-500 font-semibold">완료건수</div>
-            <div className="font-bold text-lg sm:text-xl text-emerald-600 mt-1 font-mono">{completedOrderCount}건</div>
+          <div className="bg-white rounded-xl border border-slate-200 p-2 shadow-sm">
+            <div className="text-[10px] text-slate-500 font-semibold">완료건수</div>
+            <div className="font-bold text-sm sm:text-base text-emerald-600 mt-0.5 font-mono">{completedOrderCount}건</div>
           </div>
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-            <div className="text-[11px] text-slate-500 font-semibold">미처리 건수</div>
-            <div className="font-bold text-lg sm:text-xl text-amber-600 mt-1 font-mono">{unprocessedOrderCount}건</div>
+          <div className="bg-white rounded-xl border border-slate-200 p-2 shadow-sm">
+            <div className="text-[10px] text-slate-500 font-semibold">미처리 건수</div>
+            <div className="font-bold text-sm sm:text-base text-amber-600 mt-0.5 font-mono">{unprocessedOrderCount}건</div>
           </div>
         </div>
 

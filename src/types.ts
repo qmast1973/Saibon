@@ -50,6 +50,8 @@ export interface Transaction {
   room: string; // e.g. 16, 221
   expense: number; // 대납금 (천원 단위 또는 원 단위 정규화)
   income: number; // 입금액
+  itemCount?: number; // 물건 갯수
+  isReturn?: boolean;
   status?: string; // e.g. 미송, 반품, 교환, 찾기, 주고옴, 매입처리, 완료, etc.
   remark?: string; // 비고
   recordType?: 'order' | 'receivable';

@@ -296,6 +296,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 </div>
               <div className="border border-slate-300 rounded-xl p-2 bg-slate-50 max-h-40 overflow-y-auto space-y-1">
                 {allMarkets.map(m => {
+                  if (m === '===== 남대문 =====') {
+                    return (
+                      <div key={m} className="px-2 py-2 my-1 text-center font-bold text-slate-500 bg-slate-200/50 rounded-lg text-[11px]">
+                        {m}
+                      </div>
+                    );
+                  }
+                  
                   const normalized = normalizeMarketName(m);
                   const isChecked = allowedMarkets.includes(normalized);
                   const otherOwners = occupiedMarkets.get(normalized) || [];

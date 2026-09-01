@@ -45,11 +45,45 @@ export async function sha256(text: string): Promise<string> {
     .join('');
 }
 
+const _MARKETS_FOR_RESOLVE = [
+  'APM', 'APM 럭스', 'APM 플레이스', '팀204', '디자이너', '누죤', '골든상가', '샤넬 마네킹', '대일 마네킹', '에소르', '누누', '유어스', '벨포스트', '퀸즈', '광희', '제일평화', '맥스타일', '신평화', '남평화', '동평화', '아트', '더블유 스튜디오', '해양', '동원', '테크노', '청평화', '신발상가', '디오트', '픽대지', '상상', '자판', '===== 남대문 =====', '세로나', '포키', '원', '시티', '페인트', '부르뎅', '마마', '웅이', '화이트', '탑', '크레용', '키즈', '팀엔드'
+];
+
+function getChosung(str: string) {
+  const cho = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+  let result = '';
+  for(let i=0; i<str.length; i++) {
+    const code = str.charCodeAt(i) - 44032;
+    if(code > -1 && code < 11172) result += cho[Math.floor(code / 588)];
+    else result += str.charAt(i);
+  }
+  return result;
+}
+
 export function normalizeMarketName(value: string | undefined): string {
-  return String(value ?? '')
-    .trim()
-    .replace(/\s+/g, ' ')
-    .replace(/[A-Za-z]+/g, m => m.toUpperCase());
+  const input = String(value ?? '').trim();
+  if (!input) return '';
+  const raw = input.replace(/\s+/g, '').toLowerCase();
+  
+  // 1. Exact match (ignoring spaces/case)
+  for (const m of _MARKETS_FOR_RESOLVE) {
+    if (m.replace(/\s+/g, '').toLowerCase() === raw) return m;
+  }
+  
+  // 2. Chosung match
+  for (const m of _MARKETS_FOR_RESOLVE) {
+    const chosung = getChosung(m).replace(/\s+/g, '').toLowerCase();
+    if (chosung === raw) return m;
+  }
+  
+  // 3. Partial Chosung or Partial match (prefix)
+  for (const m of _MARKETS_FOR_RESOLVE) {
+    const chosung = getChosung(m).replace(/\s+/g, '').toLowerCase();
+    const cleanM = m.replace(/\s+/g, '').toLowerCase();
+    if (chosung.startsWith(raw) || cleanM.startsWith(raw)) return m;
+  }
+
+  return input.replace(/\s+/g, ' ').replace(/[A-Za-z]+/g, m => m.toUpperCase());
 }
 
 export function normalizeFloorValue(value: string | undefined): string {
@@ -62,6 +96,17 @@ export function normalizeFloorValue(value: string | undefined): string {
 export function floorSortValue(value: string): number {
   const m = String(value || '').match(/-?\d+/);
   return m ? Number(m[0]) : 99999;
+}
+
+
+export function checkOrderTimeAllowed(): boolean {
+  const now = new Date();
+  const hours = now.getHours();
+  if (hours >= 2 && hours < 7) {
+    alert("주문 가능 시간이 아닙니다.\n(주문 가능 시간: 아침 7시 ~ 새벽 2시)");
+    return false;
+  }
+  return true;
 }
 
 export function getBusinessDate(baseDate = new Date()): string {
@@ -239,21 +284,22 @@ export async function firebaseSignIn(
 
   // If user profile is found in database/seeds
   if (matchedUser) {
-    // Special master password for default accounts or admin
-    const isDefaultAdminPassword = (matchedUser.role === 'admin' || matchedUser.username === 'admin') &&
-      (password === 'admin1234' || password === '1234' || password === '123456' || password === 'admin');
-    const isDefaultSeedPassword = (matchedUser.uid?.startsWith('seed_')) &&
-      (password === '123456' || password === '1234' || password === 'admin1234');
-
     if (matchedUser.passwordHash) {
-      if (matchedUser.passwordHash === inputHash || isDefaultAdminPassword || isDefaultSeedPassword) {
+      if (matchedUser.passwordHash === inputHash) {
         return { user: matchedUser };
       } else {
         throw new Error('비밀번호가 일치하지 않습니다. 다시 확인해주세요.');
       }
     } else {
-      // Legacy user without hash or admin
-      if (isDefaultAdminPassword || isDefaultSeedPassword || password.length >= 4) {
+      // Legacy user or uninitialized user without hash
+      const isDefaultAdminPassword = (matchedUser.role === 'admin' || matchedUser.username === 'admin') &&
+        (password === 'admin1234' || password === '1234' || password === '123456' || password === 'admin');
+      const isDefaultSeedPassword = (matchedUser.uid?.startsWith('seed_')) &&
+        (password === '123456' || password === '1234' || password === 'admin1234');
+      
+      const isNormalUserInitializing = !matchedUser.uid?.startsWith('seed_') && matchedUser.role !== 'admin' && password.length >= 4;
+
+      if (isDefaultAdminPassword || isDefaultSeedPassword || isNormalUserInitializing) {
         matchedUser.passwordHash = inputHash;
         saveUserToFirebase(matchedUser).catch(() => {});
         return { user: matchedUser };
@@ -351,7 +397,9 @@ export function onAuthStateChange(callback: (user: FirebaseUser | null) => void)
 function getBlacklistedUsers(): string[] {
   try {
     return JSON.parse(localStorage.getItem('deleted_firebase_users') || '[]');
-  } catch { return []; }
+  } catch { return [
+    'APM', 'APM 럭스', 'APM 플레이스', '팀204', '디자이너', '누죤', '골든상가', '샤넬 마네킹', '대일 마네킹', '에소르', '누누', '유어스', '벨포스트', '퀸즈', '광희', '제일평화', '맥스타일', '신평화', '남평화', '동평화', '아트', '더블유 스튜디오', '해양', '동원', '테크노', '청평화', '신발상가', '디오트', '픽대지', '상상', '자판', '남대', '세로나', '포키', '원', '시티', '페인트', '부르뎅', '마마', '웅이', '화이트', '탑', '크레용', '키즈', '팀엔드'
+  ]; }
 }
 function blacklistUser(username: string) {
   try {
@@ -493,6 +541,8 @@ export function syncFirebaseOrders(onOrdersUpdate: (orders: Transaction[]) => vo
             market,
             floor: String(order?.층 || ''),
             room: String(order?.호수 || ''),
+            itemCount: Number(order?.수량 ?? 0),
+            isReturn: Boolean(order?.반품여부),
             expense: isPayment ? -Math.abs(payment) : payment,
             income,
             status: String(order?.완료여부 || ''),
@@ -531,6 +581,8 @@ export async function saveOrderToFirebase(t: Transaction): Promise<string> {
     층: String(t.floor || ''),
     호수: String(t.room || ''),
     담당: String(t.manager || t.originalManager || ''),
+    수량: Number(t.itemCount ?? 0),
+    반품여부: Boolean(t.isReturn),
     대납금: finalPayment,
     입금액: Number(t.income || 0),
     메모: String(t.remark || ''),
@@ -704,6 +756,8 @@ export async function saveOrdersBulkToFirebase(transactions: Transaction[]): Pro
         층: String(t.floor || ''),
         호수: String(t.room || ''),
         담당: String(t.manager || t.originalManager || ''),
+        수량: Number(t.itemCount ?? 0),
+        반품여부: Boolean(t.isReturn),
         대납금: payment,
         입금액: Number(t.income || 0),
         메모: String(t.remark || ''),
@@ -757,5 +811,33 @@ export const saveAnnouncement = async (text: string): Promise<void> => {
     ]);
   } catch (err) {
     console.warn('Failed to save announcement immediately, will sync when online:', err);
+  }
+};
+
+
+export const getMarkets = async (): Promise<string[]> => {
+  try {
+    const docRef = doc(firestore, 'settings', 'markets_v2');
+    const snap = await getDoc(docRef);
+    if (snap.exists() && Array.isArray(snap.data().list)) {
+      return snap.data().list;
+    }
+  } catch (err) {
+    console.warn('Failed to fetch markets from Firestore:', err);
+  }
+  // Default fallback list
+  return ['APM', 'APM 럭스', 'APM 플레이스', '팀204', '디자이너', '누죤', '골든상가', '샤넬 마네킹', '대일 마네킹', '에소르', '누누', '유어스', '벨포스트', '퀸즈', '광희', '제일평화', '맥스타일', '신평화', '남평화', '동평화', '아트', '더블유 스튜디오', '해양', '동원', '테크노', '청평화', '신발상가', '디오트', '픽대지', '상상', '자판', '===== 남대문 =====', '세로나', '포키', '원', '시티', '페인트', '부르뎅', '마마', '웅이', '화이트', '탑', '크레용', '키즈', '팀엔드'];
+};
+
+export const saveMarkets = async (markets: string[]): Promise<void> => {
+  try {
+    const docRef = doc(firestore, 'settings', 'markets_v2');
+    await Promise.race([
+      setDoc(docRef, { list: markets, updatedAt: new Date().toISOString() }, { merge: true }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore timeout')), 2000))
+    ]);
+  } catch (err) {
+    console.warn('Failed to save markets:', err);
+    throw err;
   }
 };

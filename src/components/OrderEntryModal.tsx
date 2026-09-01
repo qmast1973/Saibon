@@ -39,12 +39,7 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
   const [date, setDate] = useState(editingTransaction?.date || selectedDate);
   const [store, setStore] = useState(editingTransaction?.store || (isMerchant ? currentUser?.storeName || '' : ''));
   const [remark, setRemark] = useState(editingTransaction?.remark || '');
-  const [expense, setExpense] = useState<number | string>(editingTransaction?.expense ? Number(editingTransaction.expense) : '');
-  const [income, setIncome] = useState<number | string>(editingTransaction?.income ? Number(editingTransaction.income) : '');
-  const [status, setStatus] = useState(editingTransaction?.status || '');
-  const [manager, setManager] = useState(editingTransaction?.manager || '');
-  const [region, setRegion] = useState(editingTransaction?.region || (isMerchant ? '합성동' : ''));
-
+          
   const [orderRows, setOrderRows] = useState<OrderRowItem[]>(
     isEditMode
       ? [{ market: editingTransaction.market || '', floor: editingTransaction.floor || '', room: editingTransaction.room || '' }]
@@ -95,6 +90,10 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
         alert('건물명, 층, 호수를 모두 입력해주세요.');
         return;
       }
+      if (r.market.trim() === '===== 남대문 =====') {
+        alert('올바른 건물명을 입력해주세요.');
+        return;
+      }
     }
 
     setIsSaving(true);
@@ -111,11 +110,11 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
           market: normalizeMarketName(r.market),
           floor: r.floor.trim(),
           room: r.room.trim(),
-          manager: isBuyer ? (editingTransaction.manager || manager) : manager,
-          region: region || editingTransaction.region || '합성동',
-          expense: Number(expense) || 0,
-          income: Number(income) || 0,
-          status: status.trim(),
+          manager: editingTransaction?.manager || "",
+          region: editingTransaction?.region || "",
+          expense: editingTransaction?.expense || 0,
+          income: editingTransaction?.income || 0,
+          status: editingTransaction?.status || "",
           remark: remark.trim(),
           merchantId: editingTransaction.merchantId || (isMerchant ? currentUser?.username : ''),
           merchantName: editingTransaction.merchantName || (isMerchant ? currentUser?.name : ''),
@@ -134,11 +133,11 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
             market: normalizeMarketName(r.market),
             floor: r.floor.trim(),
             room: r.room.trim(),
-            manager: manager.trim(),
-            region: region.trim() || '합성동',
-            expense: Number(expense) || 0,
-            income: Number(income) || 0,
-            status: status.trim(),
+            manager: "",
+            region: "",
+            expense: editingTransaction?.expense || 0,
+            income: editingTransaction?.income || 0,
+            status: editingTransaction?.status || "",
             remark: remark.trim(),
             merchantId: isMerchant ? currentUser?.username : '',
             merchantName: isMerchant ? currentUser?.name : '',
@@ -220,33 +219,7 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
             </div>
           </div>
 
-          {/* If not merchant: allow assigning manager/region */}
-          {!isMerchant && (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">담당 삼촌</label>
-                <input
-                  type="text"
-                  value={manager}
-                  disabled={isRegularBuyer}
-                  onChange={(e) => setManager(e.target.value)}
-                  placeholder="예: 강군, 영복, 준우, 인혁"
-                  className={`w-full border border-slate-300 rounded-xl p-2.5 bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none ${isRegularBuyer ? 'bg-slate-100 cursor-not-allowed' : 'focus:bg-white'}`}
-                />
-              </div>
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">지역</label>
-                <input
-                  type="text"
-                  value={region}
-                  disabled={isRegularBuyer}
-                  onChange={(e) => setRegion(e.target.value)}
-                  placeholder="예: 합성동"
-                  className={`w-full border border-slate-300 rounded-xl p-2.5 bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none ${isRegularBuyer ? 'bg-slate-100 cursor-not-allowed' : 'focus:bg-white'}`}
-                />
-              </div>
-            </div>
-          )}
+          
 
           {/* Multi-row Order Entry */}
           <div>
@@ -266,6 +239,7 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
                     value={row.market}
                     disabled={isRegularBuyer && isEditMode}
                     onChange={(e) => handleRowChange(index, 'market', e.target.value)}
+                    onBlur={(e) => handleRowChange(index, 'market', normalizeMarketName(e.target.value))}
                     placeholder="예: 디오트, APM, 청평"
                     className={`w-full border border-slate-300 rounded-xl p-2.5 text-xs bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none ${(isRegularBuyer && isEditMode) ? 'bg-slate-100 cursor-not-allowed' : 'focus:bg-white'}`}
                   />
@@ -300,7 +274,13 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
             </div>
 
             <datalist id="marketDatalist">
-              {allMarkets.map(m => <option key={m} value={m} />)}
+              {allMarkets.map(m => (
+                <option 
+                  key={m} 
+                  value={m} 
+                  disabled={m === '===== 남대문 ====='} 
+                />
+              ))}
             </datalist>
 
             {!isEditMode && (
@@ -339,52 +319,7 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
             </div>
           </div>
 
-          {/* Financial & Status for Admins / Buyers */}
-          {!isMerchant && (
-            <div className="grid grid-cols-3 gap-2.5 pt-1">
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">대납금 (천원)</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={expense}
-                  disabled={isRegularBuyer}
-                  onChange={(e) => setExpense(e.target.value)}
-                  placeholder="0"
-                  className={`w-full border border-slate-300 rounded-xl p-2.5 text-xs bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none ${isRegularBuyer ? 'bg-slate-100 cursor-not-allowed' : 'focus:bg-white'}`}
-                />
-              </div>
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">입금액 (천원)</label>
-                <input
-                  type="number"
-                  min="0"
-                  disabled={isRegularBuyer}
-                  value={income}
-                  onChange={(e) => setIncome(e.target.value)}
-                  placeholder="0"
-                  className={`w-full border border-slate-300 rounded-xl p-2.5 text-xs bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none ${isRegularBuyer ? 'bg-slate-100 cursor-not-allowed' : 'focus:bg-white'}`}
-                />
-              </div>
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">상태</label>
-                <select
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                  className="w-full border border-slate-300 rounded-xl p-2.5 text-xs bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none focus:bg-white font-medium"
-                >
-                  <option value="">(상태 미지정)</option>
-                  <option value="미송">미송</option>
-                  <option value="반품">반품</option>
-                  <option value="교환">교환</option>
-                  <option value="찾기">찾기</option>
-                  <option value="주고옴">주고옴</option>
-                  <option value="매입처리">매입처리</option>
-                  <option value="완료">완료</option>
-                </select>
-              </div>
-            </div>
-          )}
+          
 
           {/* Remark / Memo */}
           <div>

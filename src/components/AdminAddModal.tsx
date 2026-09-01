@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { User } from '../types';
 import { sha256, saveUserToFirebase } from '../lib/firebase';
+import { convertKoreanToEnglish } from '../lib/keyboard';
 import { ShieldAlert, ShieldCheck, X, Check, Eye, EyeOff } from 'lucide-react';
 
 interface AdminAddModalProps {

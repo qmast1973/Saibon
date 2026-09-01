@@ -12,7 +12,7 @@ export const AnnouncementModal: React.FC<AnnouncementModalProps> = ({ isOpen, on
   if (!isOpen || !announcement.trim()) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
       <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-slide-up">
         <div className="flex items-center justify-between p-4 bg-indigo-600">
           <div className="flex items-center gap-2 text-white">
