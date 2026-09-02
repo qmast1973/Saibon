@@ -32,6 +32,8 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
   const [confirmStep, setConfirmStep] = useState<'idle' | 'confirm_factory_reset'>('idle');
 
   const isAdmin = currentUser?.role === 'admin';
+  const isSubAdmin = currentUser?.role === 'buyer' && currentUser?.isBuyerAdmin;
+  const hasAdminAccess = isAdmin || isSubAdmin;
 
   const handleFactoryReset = async () => {
     setLoading(true);
@@ -188,6 +190,8 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
             </div>
           )}
 
+          {isAdmin && (
+            <>
           {/* Option 1: Factory Reset for Real Usage */}
           <div className="bg-red-950/20 border border-red-900/60 rounded-xl p-4 space-y-3">
             <div className="flex items-start gap-3">
@@ -204,7 +208,6 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
                 </p>
               </div>
             </div>
-
             {confirmStep !== 'confirm_factory_reset' ? (
               <button
                 type="button"
@@ -216,48 +219,33 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
                 <span>데이터 전체 비우기</span>
               </button>
             ) : (
-              <div className="bg-slate-950/80 border border-red-600/60 rounded-xl p-3.5 space-y-2.5 animate-fadeIn">
-                <div className="flex items-center gap-2 text-red-400 text-xs font-bold">
-                  <AlertTriangle className="w-4 h-4 shrink-0" />
-                  <span>정말로 모든 데이터를 삭제하시겠습니까?</span>
-                </div>
-                <p className="text-[11px] text-slate-400 leading-normal">
-                  서버 및 모든 사용자의 거래 내역이 삭제되며, 복구할 수 없습니다. 계속 진행하시겠습니까?
+              <div className="mt-2 p-3 bg-red-950/50 border border-red-800/80 rounded-xl">
+                <p className="text-xs text-red-300 font-bold mb-2.5 flex items-center justify-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4" />
+                  정말 모든 데이터를 삭제하시겠습니까?
                 </p>
-                <div className="flex gap-2 pt-1">
+                <div className="flex gap-2">
                   <button
                     type="button"
-                    disabled={loading}
-                    onClick={handleFactoryReset}
-                    className="flex-1 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5 shadow-md"
+                    onClick={() => setConfirmStep('idle')}
+                    className="flex-1 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold rounded-lg transition"
                   >
-                    {loading ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>초기화 진행 중...</span>
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>네, 삭제합니다</span>
-                      </>
-                    )}
+                    취소
                   </button>
                   <button
                     type="button"
                     disabled={loading}
-                    onClick={() => setConfirmStep('idle')}
-                    className="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg transition"
+                    onClick={handleFactoryReset}
+                    className="flex-1 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-lg transition flex items-center justify-center gap-2"
                   >
-                    취소
+                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>네, 삭제합니다</span>}
                   </button>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Option 3: Deduplicate */}
-          <div className="bg-amber-950/20 border border-amber-900/60 rounded-xl p-4 space-y-2.5 mb-4">
+          <div className="bg-amber-950/20 border border-amber-900/60 rounded-xl p-4 space-y-2.5">
             <div className="flex items-start gap-3">
               <div className="w-8 h-8 rounded-lg bg-amber-900/50 flex items-center justify-center text-amber-300 shrink-0 mt-0.5">
                 <Layers className="w-4 h-4" />
@@ -302,6 +290,8 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
               <span>수금 기록 초기화</span>
             </button>
           </div>
+          </>
+          )}
         </div>
 
         {/* Footer */}

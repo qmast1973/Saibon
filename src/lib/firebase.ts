@@ -18,7 +18,7 @@ import {
   onSnapshot,
   deleteDoc
 } from 'firebase/firestore';
-import { getDatabase, ref, set, remove, onValue, get, update } from 'firebase/database';
+import { getDatabase, ref, set, remove, onValue, get, update, push, query, limitToLast, orderByKey } from 'firebase/database';
 import { User, UserRole, Transaction, CollectionGroupRule, CollectionRecord } from '../types';
 
 export const FIREBASE_CONFIG = {
@@ -204,7 +204,7 @@ export async function firebaseSignUp(params: SignUpParams): Promise<User> {
         try {
           await updateProfile(cred.user, { displayName: params.name });
         } catch (e) {
-          console.warn('Could not update Firebase Auth profile display name', e);
+          console.warn('Could not update, Firebase Auth profile display name', e);
         }
       }
     }
@@ -502,7 +502,9 @@ export async function deleteUserFromFirebase(username: string): Promise<void> {
 
 export function syncFirebaseOrders(onOrdersUpdate: (orders: Transaction[]) => void) {
   const ordersRef = ref(rtdb, 'orders');
-  return onValue(ordersRef, (snapshot) => {
+  // 성능 최적화: 최근 90일(약 3개월) 데이터만 가져오도록 제한
+  const recentOrdersQuery = query(ordersRef, orderByKey(), limitToLast(90));
+  return onValue(recentOrdersQuery, (snapshot) => {
     const data = snapshot.val() || {};
     const remoteRows: Transaction[] = [];
     Object.entries(data).forEach(([dateKey, dayOrders]: [string, any]) => {
@@ -545,7 +547,7 @@ export function syncFirebaseOrders(onOrdersUpdate: (orders: Transaction[]) => vo
             isReturn: Boolean(order?.반품여부),
             expense: isPayment ? -Math.abs(payment) : payment,
             income,
-            status: String(order?.완료여부 || ''),
+            status: String(order?.완료여부 || '') === '미완료' ? '' : String(order?.완료여부 || ''),
             remark: String(order?.메모 || ''),
             recordType: market === '미수금' ? 'receivable' : 'order',
             importedFromFirebase: true
@@ -609,7 +611,7 @@ export async function saveOrderToFirebase(t: Transaction): Promise<string> {
     
     await Promise.race([
       Promise.all(operations),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('RTDB Timeout')), 1500))
+      new Promise((_, reject) => setTimeout(() => reject(new Error('RTDB Timeout')), 10000))
     ]);
   } catch(e) {
     console.warn('Order save timeout or offline. Handled in background:', e);
@@ -622,7 +624,7 @@ export async function deleteOrderFromFirebase(t: Transaction): Promise<void> {
   try {
     await Promise.race([
       remove(ref(rtdb, `orders/${t.firebaseDate}/${t.firebaseOrderId}`)),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('RTDB Timeout')), 1500))
+      new Promise((_, reject) => setTimeout(() => reject(new Error('RTDB Timeout')), 10000))
     ]);
   } catch(e) {
     console.warn('Order delete timeout or offline. Handled in background:', e);
@@ -647,7 +649,7 @@ export async function saveGroupRulesToFirebase(rules: CollectionGroupRule[]): Pr
   try {
     await Promise.race([
       set(rulesRef, rules),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('RTDB Timeout')), 1500))
+      new Promise((_, reject) => setTimeout(() => reject(new Error('RTDB Timeout')), 10000))
     ]);
   } catch(e) {
     console.warn('saveGroupRulesToFirebase timeout:', e);
@@ -779,7 +781,7 @@ export async function saveOrdersBulkToFirebase(transactions: Transaction[]): Pro
     if (Object.keys(updates).length > 0) {
       await Promise.race([
         update(ref(rtdb), updates),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('RTDB Timeout')), 2000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('RTDB Timeout')), 10000))
       ]);
     }
   } catch (error) {
@@ -789,30 +791,7 @@ export async function saveOrdersBulkToFirebase(transactions: Transaction[]): Pro
 
 
 
-export const getAnnouncement = async (): Promise<string> => {
-  try {
-    const docRef = doc(firestore, 'settings', 'announcement');
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      return snap.data().text || '';
-    }
-  } catch (err) {
-    console.warn('Announcement not loaded initially, might be offline.');
-  }
-  return '';
-};
 
-export const saveAnnouncement = async (text: string): Promise<void> => {
-  try {
-    const docRef = doc(firestore, 'settings', 'announcement');
-    await Promise.race([
-      setDoc(docRef, { text, updatedAt: new Date().toISOString() }, { merge: true }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore timeout')), 2000))
-    ]);
-  } catch (err) {
-    console.warn('Failed to save announcement immediately, will sync when online:', err);
-  }
-};
 
 
 export const getMarkets = async (): Promise<string[]> => {
@@ -841,3 +820,49 @@ export const saveMarkets = async (markets: string[]): Promise<void> => {
     throw err;
   }
 };
+
+export function subscribeToBoardPosts(callback: (posts: any[]) => void): () => void {
+  const postsRef = ref(rtdb, 'board');
+  const unsubscribe = onValue(postsRef, (snapshot) => {
+    const posts = [];
+    if (snapshot.exists()) {
+      snapshot.forEach((child) => {
+        posts.push({ id: child.key, ...child.val() });
+      });
+    }
+    callback(posts.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+  });
+  return unsubscribe;
+}
+
+export async function addBoardPost(post: Omit<import('../types').BoardPost, 'id' | 'createdAt'>): Promise<void> {
+  const postsRef = ref(rtdb, 'board');
+  const newPostRef = push(postsRef);
+  await set(newPostRef, {
+    ...post,
+    createdAt: new Date().toISOString()
+  });
+}
+
+
+export async function updateBoardPost(id: string, data: { title: string; content: string }): Promise<void> {
+  const postRef = ref(rtdb, `board/${id}`);
+  await update(postRef, data);
+}
+
+export async function deleteBoardPost(id: string): Promise<void> {
+  await remove(ref(rtdb, `board/${id}`));
+}
+
+export async function addBoardComment(postId: string, comment: Omit<import('../types').BoardComment, 'id' | 'createdAt'>): Promise<void> {
+  const commentsRef = ref(rtdb, `board/${postId}/comments`);
+  const newCommentRef = push(commentsRef);
+  await set(newCommentRef, {
+    ...comment,
+    createdAt: new Date().toISOString()
+  });
+}
+
+export async function deleteBoardComment(postId: string, commentId: string): Promise<void> {
+  await remove(ref(rtdb, `board/${postId}/comments/${commentId}`));
+}

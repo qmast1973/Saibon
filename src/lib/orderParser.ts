@@ -124,7 +124,7 @@ export function parseSmartOrderText(
       continue;
     }
 
-    // 소매 상호 그룹 헤더 감지 (예: "[초록밀크]", "소매: 초록밀크", "★초록밀크★", "■ 쵸이마켓")
+    // 소매 상호 그룹 헤더 감지 (예: "[초코송이마켓]", "소매: 초코송이마켓", "★초코송이마켓★", "■ 구름상회")
     const storeHeaderMatch = rawLine.match(/^(?:\[|★|■|▶|◆|\*|소매\s*:\s*|상호\s*:\s*)([가-힣A-Za-z0-9_\s]{2,20})(?:\]|★|■|▶|◆|\*)?$/);
     if (storeHeaderMatch) {
       const candidate = storeHeaderMatch[1].trim();

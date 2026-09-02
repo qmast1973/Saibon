@@ -19,7 +19,7 @@ interface CollectionScreenProps {
   initialDate?: string;
 }
 
-export const CollectionScreen: React.FC<CollectionScreenProps> = ({
+export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
   transactions,
   collections,
   currentUser,
@@ -83,41 +83,39 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
   };
 
   // Memoized filter rows
-  const rows = useMemo(() => {
-    return transactions.map(t => {
-      const rawExpense = Number(t.expense) || 0;
-      const rawIncome = Number(t.income) || 0;
-      const billed = rawExpense > 0 ? rawExpense : 0;
-      const paid = (rawExpense < 0 ? Math.abs(rawExpense) : 0) + (rawIncome > 0 ? rawIncome : 0);
-      const buyerName = String(t.actualManager || t.manager || t.originalManager || '').trim() || '미지정';
-      return {
-        ...t,
-        _region: String(t.region || '미지정').trim() || '미지정',
-        _manager: String(t.localManager || t.originalManager || t.manager || '미지정').trim() || '미지정',
-        _buyer: buyerName,
-        _store: String(t.store || '미지정').trim() || '미지정',
-        _billingStore: getCollectionBillingStore(t.store),
-        _expense: billed,
-        _income: paid
-      };
-    });
-  }, [transactions, getCollectionBillingStore]);
-
   useEffect(() => {
-    if (!hasAutoSetDate && rows.length > 0) {
-      const dates = rows.map(r => r.date).filter(Boolean).sort();
+    if (!hasAutoSetDate && transactions.length > 0) {
+      const dates = transactions.map(r => r.date).filter(Boolean).sort();
       if (dates.length > 0) {
         setDateFilter(dates[dates.length - 1]);
         setHasAutoSetDate(true);
       }
     }
-  }, [rows, hasAutoSetDate]);
+  }, [transactions, hasAutoSetDate]);
 
   const ledgerRows = useMemo(() => {
-    return dateFilter
-      ? rows.filter(t => t.date === dateFilter && normalizeMarketName(t.market || '') !== '미수금')
-      : [];
-  }, [rows, dateFilter]);
+    if (!dateFilter) return [];
+    
+    return transactions
+      .filter(t => t.date === dateFilter && normalizeMarketName(t.market || '') !== '미수금')
+      .map(t => {
+        const rawExpense = Number(t.expense) || 0;
+        const rawIncome = Number(t.income) || 0;
+        const billed = rawExpense > 0 ? rawExpense : 0;
+        const paid = (rawExpense < 0 ? Math.abs(rawExpense) : 0) + (rawIncome > 0 ? rawIncome : 0);
+        const buyerName = String(t.actualManager || t.manager || t.originalManager || '').trim() || '미지정';
+        return {
+          ...t,
+          _region: String(t.region || '미지정').trim() || '미지정',
+          _manager: String(t.localManager || t.originalManager || t.manager || '미지정').trim() || '미지정',
+          _buyer: buyerName,
+          _store: String(t.store || '미지정').trim() || '미지정',
+          _billingStore: getCollectionBillingStore(t.store),
+          _expense: billed,
+          _income: paid
+        };
+      });
+  }, [transactions, dateFilter, getCollectionBillingStore]);
 
   const totalBilled = useMemo(() => ledgerRows.reduce((a, t) => a + t._expense, 0), [ledgerRows]);
   const totalPaid = useMemo(() => ledgerRows.reduce((a, t) => a + t._income, 0), [ledgerRows]);
@@ -163,7 +161,7 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
         t.actualManager === buyerFilter || 
         t.originalManager === buyerFilter;
       const isOrder = normalizeMarketName(t.market || '') !== '입금' && normalizeMarketName(t.market || '') !== '미수금';
-      const isCompleted = (t.status || '').trim() === '완료';
+      const isCompleted = (t.status || '').trim() !== '';
 
       let statusOk = true;
       if (statusFilter === '미처리') {
@@ -212,7 +210,7 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
       const isOrder = normalizeMarketName(t.market || '') !== '입금' && normalizeMarketName(t.market || '') !== '미수금';
       if (isOrder && (t._expense > 0 || (t._expense === 0 && t._income === 0))) {
         g.orderCount += 1;
-        if ((t.status || '').trim() === '완료') {
+        if ((t.status || '').trim() !== '') {
           g.completedCount += 1;
         } else {
           g.unprocessedCount += 1;
@@ -234,9 +232,9 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
 
   const uniqueStores = useMemo(() => {
     const stores = new Set<string>();
-    rows.forEach(t => stores.add(t._billingStore));
+    transactions.forEach(t => stores.add(getCollectionBillingStore(String(t.store || '미지정').trim() || '미지정')));
     return Array.from(stores).filter(Boolean).sort();
-  }, [rows]);
+  }, [transactions, getCollectionBillingStore]);
 
   const filteredStoresForEntry = useMemo(() => {
     // Show all if empty, otherwise filter by chosung / substring
@@ -638,8 +636,8 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
         {showOrderListModal && (() => {
           const storeRows = filteredRows.filter(t => t._billingStore === orderListStore);
           const storeOrders = storeRows.filter(t => normalizeMarketName(t.market || '') !== '입금' && normalizeMarketName(t.market || '') !== '미수금');
-          const storeCompleted = storeOrders.filter(t => (t.status || '').trim() === '완료').length;
-          const storeUnprocessed = storeOrders.filter(t => (t.status || '').trim() !== '완료').length;
+          const storeCompleted = storeOrders.filter(t => (t.status || '').trim() !== '').length;
+          const storeUnprocessed = storeOrders.filter(t => (t.status || '').trim() === '').length;
 
           return (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[180] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
@@ -689,7 +687,7 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
                     })
                     .map(t => {
                       const isDeposit = normalizeMarketName(t.market || '') === '입금';
-                      const isCompleted = (t.status || '').trim() === '완료';
+                      const isCompleted = (t.status || '').trim() !== '';
 
                       return (
                       <div
@@ -779,4 +777,4 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
       </div>
     </div>
   );
-};
+});

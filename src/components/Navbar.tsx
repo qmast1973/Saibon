@@ -1,6 +1,6 @@
 import React from 'react';
 import { User } from '../types';
-import { Database, Calculator, Store, LogOut, Users, HandCoins } from 'lucide-react';
+import { Database, Calculator, Store, LogOut, Users, HandCoins, MessageSquare } from 'lucide-react';
 
 interface NavbarProps {
   currentUser: User | null;
@@ -10,6 +10,7 @@ interface NavbarProps {
   onOpenCollectionScreen: () => void;
   onOpenBuyerWorkday?: () => void;
   onOpenAdminManagement: () => void;
+  onOpenBoard?: () => void;
   onLogout: () => void;
 }
 
@@ -21,16 +22,19 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenCollectionScreen,
   onOpenBuyerWorkday,
   onOpenAdminManagement,
+  onOpenBoard,
   onLogout
 }) => {
   const isMerchant = currentUser?.role === 'merchant';
   const isBuyer = currentUser?.role === 'buyer';
   const isLocal = currentUser?.role === 'local';
   const isAdmin = currentUser?.role === 'admin';
+  const isSubAdmin = currentUser?.role === 'buyer' && currentUser?.isBuyerAdmin;
+  const hasAdminAccess = isAdmin || isSubAdmin;
 
   const userLabel = currentUser ? (
     currentUser.role === 'buyer'
-      ? `${currentUser.name} · 사입삼촌`
+      ? `${currentUser.name} · ${currentUser.isBuyerAdmin ? '서브관리자(사입)' : '사입삼촌'}`
       : currentUser.role === 'local'
       ? `${currentUser.name} · ${currentUser.assignedRegion || '지방삼촌'}`
       : currentUser.role === 'merchant'
@@ -68,7 +72,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           {/* Data Management Button (Moved here) */}
-          {isAdmin && (
+          {hasAdminAccess && (
             <button
               type="button"
               onClick={onOpenDataManagement}
@@ -85,6 +89,16 @@ export const Navbar: React.FC<NavbarProps> = ({
           
           {/* Top Right: User Info & Logout */}
           <div className="flex items-center gap-1.5 sm:gap-2 pt-0.5">
+            {onOpenBoard && (
+              <button
+                type="button"
+                onClick={onOpenBoard}
+                className="bg-amber-500 hover:bg-amber-400 text-white px-2 py-1 sm:px-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition flex items-center gap-1 shadow-sm"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>게시판</span>
+              </button>
+            )}
             {/* User Info Badge */}
             <div 
               onClick={onOpenProfile}
@@ -112,13 +126,12 @@ export const Navbar: React.FC<NavbarProps> = ({
               title="로그아웃"
             >
               <LogOut className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-              <span>로그아웃</span>
+              <span className="hidden sm:inline">로그아웃</span>
             </button>
           </div>
 
           {/* Bottom Right: Quick Action Menus */}
-          {(!isMerchant || isAdmin || isLocal) && (
-            <div className="flex items-center gap-1.5 flex-wrap justify-end">
+          <div className="flex items-center gap-1.5 flex-wrap justify-end">
               {(isBuyer || isAdmin) && onOpenBuyerWorkday && (
                 <button
                   type="button"
@@ -152,7 +165,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </button>
               )}
 
-              {isAdmin && (
+              {hasAdminAccess && (
                 <button
                   type="button"
                   onClick={onOpenAdminManagement}
@@ -162,8 +175,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <span>회원관리</span>
                 </button>
               )}
+              
             </div>
-          )}
         </div>
       </div>
     </header>

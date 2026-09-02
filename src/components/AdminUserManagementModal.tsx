@@ -23,6 +23,20 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
 }) => {
   const [userToDelete, setUserToDelete] = React.useState<User | null>(null);
   const [alertMsg, setAlertMsg] = React.useState<string | null>(null);
+  const handleToggleBuyerAdmin = async (user: User) => {
+    if (currentUser?.role !== 'admin') {
+      alert('최고 관리자만 서브관리자 권한을 부여할 수 있습니다.');
+      return;
+    }
+    try {
+      const updated: User = { ...user, isBuyerAdmin: !user.isBuyerAdmin };
+      await saveUserToFirebase(updated);
+    } catch (err) {
+      console.error(err);
+      alert('권한 변경에 실패했습니다.');
+    }
+  };
+
   const handleToggleApproval = async (user: User) => {
     try {
       const updated: User = {
@@ -84,6 +98,10 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
   };
   
   const confirmDelete = async () => {
+    if (currentUser?.role !== 'admin') {
+      alert('최고 관리자만 회원을 삭제할 수 있습니다.');
+      return;
+    }
     if (!userToDelete) return;
     const user = userToDelete;
     setUserToDelete(null);
@@ -108,6 +126,13 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
     { role: 'merchant', title: '상인 (소매점)', icon: Store, color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200' },
     { role: 'admin', title: '관리자', icon: Shield, color: 'text-rose-700', bg: 'bg-rose-50 border-rose-200' }
   ];
+  const visibleCategories = currentUser?.role === 'buyer' 
+    ? roleCategories.filter(cat => cat.role === 'buyer')
+    : roleCategories;
+
+  const visibleUsers = currentUser?.role === 'buyer'
+    ? users.filter(u => u.role === 'buyer')
+    : users;
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[250] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
@@ -153,9 +178,10 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
         {/* Toolbar */}
         <div className="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2 shrink-0 flex-wrap">
           <div className="text-xs text-slate-600 font-semibold">
-            총 등록 회원: <span className="text-indigo-600 font-bold">{users.length}명</span>
+            총 등록 회원: <span className="text-indigo-600 font-bold">{visibleUsers.length}명</span>
           </div>
           <div className="flex items-center gap-2">
+            {currentUser?.role === 'admin' && (
             <button
               type="button"
               onClick={onOpenAdminAdd}
@@ -164,13 +190,14 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
               <UserPlus className="w-3.5 h-3.5" />
               관리자 추가
             </button>
+            )}
           </div>
         </div>
 
         {/* User list by role category */}
         <div className="p-4 overflow-y-auto space-y-4">
-          {roleCategories.map(cat => {
-            const groupUsers = users.filter(u => u.role === cat.role);
+          {visibleCategories.map(cat => {
+            const groupUsers = visibleUsers.filter(u => u.role === cat.role);
             if (groupUsers.length === 0) return null;
 
             const Icon = cat.icon;
@@ -242,6 +269,20 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
                           수정
                         </button>
 
+                        {user.role === 'buyer' && currentUser?.role === 'admin' && (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleBuyerAdmin(user)}
+                            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${
+                              user.isBuyerAdmin
+                                ? 'bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'
+                            }`}
+                          >
+                            <Shield className="w-3 h-3" />
+                            {user.isBuyerAdmin ? '서브관리자 해제' : '서브관리자 부여'}
+                          </button>
+                        )}
                         {user.role !== 'admin' && (
                           <button
                             type="button"

@@ -15,8 +15,6 @@ import {
   factoryResetDatabase,
   saveOrdersBulkToFirebase,
   normalizeDateStr,
-  getAnnouncement,
-  saveAnnouncement,
   getMarkets,
   saveMarkets,
   firestore
@@ -29,6 +27,7 @@ import {
   getLocalUsers,
   saveLocalUser,
   saveTransactionsToIndexedDB,
+  updateTransactionInIndexedDB,
   loadTransactionsFromIndexedDB,
   loadCollections,
   saveCollections
@@ -41,16 +40,17 @@ import { AdminUserManagementModal } from './components/AdminUserManagementModal'
 import { ProfileModal } from './components/ProfileModal';
 import { OrderEntryModal } from './components/OrderEntryModal';
 import { CalendarView } from './components/CalendarView';
+import { AiOrderImportModal } from './components/AiOrderImportModal';
 
 import { CollectionScreen } from './components/CollectionScreen';
 import { GroupRulesManagerModal } from './components/GroupRulesManagerModal';
 
 import { BuyerWorkdayScreen } from './components/BuyerWorkdayScreen';
+import { BoardScreen } from './components/BoardScreen';
 import { ExcelImportWizard } from './components/ExcelImportWizard';
 import { LocalMerchantInfoModal } from './components/LocalMerchantInfoModal';
 import { DataManagementModal } from './components/DataManagementModal';
 import { BuildingManagerModal } from './components/BuildingManagerModal';
-import { AnnouncementModal, AnnouncementBanner } from './components/AnnouncementComponents';
 import { Search } from 'lucide-react';
 
 export default function App() {
@@ -74,8 +74,10 @@ export default function App() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [profileTargetUsername, setProfileTargetUsername] = useState<string | null>(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
+  const [showAiModal, setShowAiModal] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
     const [showBuyerWorkdayScreen, setShowBuyerWorkdayScreen] = useState(false);
+  const [showBoardScreen, setShowBoardScreen] = useState(false);
 
   const [collections, setCollections] = useState<CollectionRecord[]>([]);
   const [collectionGroupRules, setCollectionGroupRules] = useState<CollectionGroupRule[]>([]);
@@ -87,10 +89,6 @@ export default function App() {
   const [showBuildingManagerModal, setShowBuildingManagerModal] = useState(false);
   const [fetchedMarkets, setFetchedMarkets] = useState<string[]>(['APM', 'APM 럭스', 'APM 플레이스', '팀204', '디자이너', '누죤', '골든상가', '샤넬 마네킹', '대일 마네킹', '에소르', '누누', '유어스', '벨포스트', '퀸즈', '광희', '제일평화', '맥스타일', '신평화', '남평화', '동평화', '아트', '더블유 스튜디오', '해양', '동원', '테크노', '청평화', '신발상가', '디오트', '픽대지', '상상', '자판', '남대', '세로나', '포키', '원', '시티', '페인트', '부르뎅', '마마', '웅이', '화이트', '탑', '크레용', '키즈', '팀엔드']);
   const [pendingExcelRows, setPendingExcelRows] = useState<any[] | null>(null);
-  const [announcement, setAnnouncement] = useState<string>('');
-  const [showAnnouncementPopup, setShowAnnouncementPopup] = useState<boolean>(false);
-  const [isEditingAnnouncement, setIsEditingAnnouncement] = useState<boolean>(false);
-  const [editAnnouncementText, setEditAnnouncementText] = useState<string>('');
 
   // Pre-normalize transaction records helper
   const cleanTransactions = useCallback((txs: Transaction[]): Transaction[] => {
@@ -99,6 +97,7 @@ export default function App() {
         ...t,
         date: normalizeDateStr(t.date || t.businessDate || ''),
         market: normalizeMarketName(t.market || ''),
+        status: (t.status || '').trim() === '미완료' ? '' : (t.status || '').trim(),
         expense: Number(t.expense) || 0,
         income: Number(t.income) || 0
       }))
@@ -117,25 +116,10 @@ export default function App() {
   // 1. Initial Local Storage & Session Setup
   useEffect(() => {
     async function init() {
-      // Background fetch announcement without blocking
-      getAnnouncement().then(initialAnnouncement => {
-        if (initialAnnouncement) setAnnouncement(initialAnnouncement);
-      }).catch(() => {});
 
       getMarkets().then(m => {
         if (m && m.length > 0) setFetchedMarkets(m);
       }).catch(() => {});
-      
-      try {
-        const docRef = doc(firestore, 'settings', 'announcement');
-        onSnapshot(docRef, (snap) => {
-          if (snap.exists()) {
-            setAnnouncement(snap.data().text || '');
-          }
-        }, (err) => {
-          console.warn('onSnapshot error (likely offline):', err.message);
-        });
-      } catch (e) {}
 
       try {
         const [cachedUser, localUsers, cachedTxs, cachedCollections] = await Promise.all([
@@ -219,9 +203,6 @@ export default function App() {
 
   // Handle Login & Logout
   const handleLoginSuccess = async (user: User) => {
-    if (announcement.trim()) {
-      setShowAnnouncementPopup(true);
-    }
     setCurrentUser(user);
     await setSessionUser(user);
     if (user.role === 'buyer') {
@@ -244,7 +225,7 @@ export default function App() {
 
   // Role-based visibility base
   const roleFilteredTransactions = useMemo(() => {
-    if (currentUser?.role === 'admin' || !currentUser) {
+    if (currentUser?.role === 'admin' || currentUser?.isBuyerAdmin || !currentUser) {
       return transactions;
     }
 
@@ -355,15 +336,15 @@ export default function App() {
     let targetTx: Transaction | undefined;
     const updated = transactions.map(t => {
       if (t.id === id) {
-        const isComp = (t.status || '').trim() === '완료';
+        const isComp = (t.status || '').trim() !== '';
         targetTx = { ...t, status: isComp ? '' : '완료' };
         return targetTx;
       }
       return t;
     });
-    setTransactions(updated);
-    await saveTransactionsToIndexedDB(updated);
+    React.startTransition(() => { setTransactions(updated); });
     if (targetTx) {
+      updateTransactionInIndexedDB(targetTx).catch(console.warn);
       try {
         await saveOrderToFirebase(targetTx);
       } catch (e) {
@@ -381,9 +362,9 @@ export default function App() {
       }
       return t;
     });
-    setTransactions(updated);
-    await saveTransactionsToIndexedDB(updated);
+    React.startTransition(() => { setTransactions(updated); });
     if (targetTx) {
+      updateTransactionInIndexedDB(targetTx).catch(console.warn);
       try {
         await saveOrderToFirebase(targetTx);
       } catch (e) {
@@ -412,8 +393,8 @@ export default function App() {
         t.market || '',
         t.floor || '',
         t.room || '',
-        String(t.expense || 0),
-        String(t.income || 0),
+        ((t.expense || 0) * 1000).toString(),
+        ((t.income || 0) * 1000).toString(),
         t.status || '',
         t.remark || ''
       ]);
@@ -658,12 +639,12 @@ export default function App() {
           setShowBuyerWorkdayScreen(true);
         }}
         onOpenAdminManagement={() => setShowAdminUserManagementModal(true)}
+        onOpenBoard={() => setShowBoardScreen(true)}
         onLogout={handleLogout}
       />
 
       {/* Main Content Area */}
       <main className="max-w-7xl w-full mx-auto p-3 flex-1 flex flex-col gap-3">
-        <AnnouncementBanner announcement={announcement} currentUser={currentUser} onSave={saveAnnouncement} />
         {/* Search Bar */}
         <section className="bg-white p-2 sm:p-2.5 rounded-2xl shadow-xs border border-slate-200 flex items-center justify-between gap-2.5 text-xs">
           <div className="relative flex-1 max-w-md">
@@ -694,6 +675,7 @@ export default function App() {
           selectedDateStr={selectedDateStr}
           transactions={filteredTransactions}
           currentUser={currentUser}
+          onOpenAiModal={() => setShowAiModal(true)}
           onSelectDate={(dateStr, hasData) => {
             setSelectedDateStr(dateStr);
             if (!hasData && currentUser.role === 'merchant') {
@@ -785,7 +767,7 @@ export default function App() {
               setShowOrderModal(true);
             }
           }}
-          onToggleComplete={handleCompleteTransaction}
+          onToggleComplete={handleToggleComplete}
           onSaveCollection={async (col) => {
             const updated = [col, ...collections];
             setCollections(updated);
@@ -802,7 +784,10 @@ export default function App() {
               income: col.amount,
               expense: 0,
               remark: col.note ? `수금 (${col.note})` : '수금',
-              type: '입금',
+              manager: '',
+              region: '',
+              floor: '',
+              room: '',
               status: '완료',
               createdAt: new Date().toISOString()
             };
@@ -824,11 +809,28 @@ export default function App() {
         />
       )}
 
+
+      {showAiModal && (
+        <AiOrderImportModal
+          isOpen={showAiModal}
+          onClose={() => setShowAiModal(false)}
+          selectedDateStr={selectedDateStr}
+          currentUser={currentUser}
+          onImportOrders={(orders) => {
+            setCleanTransactions([...transactions, ...orders]);
+          }}
+        />
+      )}
+
       {showOrderModal && (
         <OrderEntryModal
           editingTransaction={editingTransaction}
           currentUser={currentUser}
           selectedDate={selectedDateStr}
+          onOpenAiModal={() => {
+            setShowOrderModal(false);
+            setShowAiModal(true);
+          }}
           stores={stores}
           allMarkets={allMarkets}
           onClose={() => {
@@ -874,7 +876,12 @@ export default function App() {
         />
       )}
 
+      
+      {showBoardScreen && currentUser && (
+        <BoardScreen currentUser={currentUser} onClose={() => setShowBoardScreen(false)} />
+      )}
       {showBuyerWorkdayScreen && (currentUser?.role === 'buyer' || currentUser?.role === 'admin') && (
+
         <BuyerWorkdayScreen
           currentUser={currentUser}
           transactions={roleFilteredTransactions}
@@ -884,9 +891,11 @@ export default function App() {
           onStartEnteringOrder={() => setShowBuyerWorkdayScreen(false)}
           onOpenAddOrder={() => setShowOrderModal(true)}
           onOpenOrder={handleEditTransaction}
-          onTransactionsUpdated={(updated) => {
-            setTransactions(updated);
-            saveTransactionsToIndexedDB(updated);
+          onUpdateTransaction={(updatedTx) => {
+            React.startTransition(() => {
+              setTransactions(prev => prev.map(t => t.id === updatedTx.id ? updatedTx : t));
+            });
+            updateTransactionInIndexedDB(updatedTx).catch(console.warn);
           }}
         />
       )}
@@ -950,7 +959,6 @@ export default function App() {
         />
       )}
 
-      <AnnouncementModal isOpen={showAnnouncementPopup} onClose={() => setShowAnnouncementPopup(false)} announcement={announcement} />
     </div>
   );
 }

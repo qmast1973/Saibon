@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import { Transaction, User } from '../types';
 import { formatMoney, normalizeDateStr } from '../lib/firebase';
 import { ChevronLeft, ChevronRight, CalendarCheck, Plus, Edit, Trash2, CheckCircle2, Sparkles } from 'lucide-react';
-import { AiOrderImportModal } from './AiOrderImportModal';
 
 interface CalendarViewProps {
   currentDate: Date;
@@ -17,9 +16,10 @@ interface CalendarViewProps {
   onDeleteTransaction: (id: string) => void;
   onCompleteTransaction: (id: string) => void;
   onImportOrders?: (orders: Transaction[]) => void;
+  onOpenAiModal?: () => void;
 }
 
-export const CalendarView: React.FC<CalendarViewProps> = ({
+export const CalendarView: React.FC<CalendarViewProps> = React.memo(({
   currentDate,
   selectedDateStr,
   transactions,
@@ -31,10 +31,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   onEditTransaction,
   onDeleteTransaction,
   onCompleteTransaction,
-  onImportOrders
+  onImportOrders,
+  onOpenAiModal
 }) => {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-  const [showAiModal, setShowAiModal] = useState<boolean>(false);
 
 
   const isMerchant = currentUser?.role === 'merchant';
@@ -216,17 +216,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             </h3>
           </div>
           <div className="flex items-center gap-2">
-            {!isBuyer && (
               <button
                 type="button"
-                onClick={() => setShowAiModal(true)}
+                onClick={onOpenAiModal}
                 className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1 transition shadow-sm"
                 title="AI로 텍스트에서 주문 자동 추출"
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">AI 입력</span>
+                <span className="hidden sm:inline">스마트 입력</span>
               </button>
-            )}
               <button
                 type="button"
                 id="selectedDayAddButton"
@@ -336,7 +334,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
                   <div className="text-slate-500 text-[11px] flex items-center gap-2">
                     <span>
-                      <b className="text-slate-700">{t.market || '-'}</b> {t.floor ? `${t.floor}층` : ''} {t.room || ''}
+                      <b className="text-slate-700">{t.market || '-'}</b> {String(t.floor || '').replace(/층$/, '') ? `${String(t.floor || '').replace(/층$/, '')}층` : ''} {String(t.room || '').replace(/호$/, '') ? `${String(t.room || '').replace(/호$/, '')}호` : ''}
                     </span>
                     {t.region && <span className="text-slate-400">| {t.region}</span>}
                   </div>
@@ -386,17 +384,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         </div>
       )}
 
-      {onImportOrders && (
-        <AiOrderImportModal
-          isOpen={showAiModal}
-          onClose={() => setShowAiModal(false)}
-          selectedDateStr={selectedDateStr}
-          currentUser={currentUser}
-          onImportOrders={(orders) => {
-            onImportOrders(orders);
-          }}
-        />
-      )}
     </section>
   );
-};
+});

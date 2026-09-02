@@ -6,7 +6,8 @@ import {
   normalizeFloorValue,
   saveOrderToFirebase,
   normalizeDateStr,
-  rtdb
+  rtdb,
+  formatMoney
 } from '../lib/firebase';
 import {
   Building2,
@@ -34,10 +35,10 @@ interface BuyerWorkdayScreenProps {
   onStartEnteringOrder: () => void;
   onOpenAddOrder?: () => void;
   onOpenOrder: (tx: Transaction) => void;
-  onTransactionsUpdated: (updated: Transaction[]) => void;
+  onUpdateTransaction: (tx: Transaction) => void;
 }
 
-export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = ({
+export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(({
   currentUser,
   transactions,
   selectedDateStr,
@@ -46,13 +47,13 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = ({
   onStartEnteringOrder,
   onOpenAddOrder,
   onOpenOrder,
-  onTransactionsUpdated
+  onUpdateTransaction
 }) => {
   
   // State
   const [selectedBuilding, setSelectedBuilding] = useState<string>('');
   const [selectedFloor, setSelectedFloor] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'uncompleted' | '완료' | '미송' | '반품'>('uncompleted');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeActionId, setActiveActionId] = useState<string | null>(null);
   const [activeActionType, setActiveActionType] = useState<'주문' | '미송' | '반품' | null>(null);
@@ -105,14 +106,10 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = ({
       list = list.filter(item => !(item.status || '').trim());
     } else if (statusFilter === 'completed') {
       list = list.filter(item => (item.status || '').trim() !== '');
+    } else if (statusFilter === 'itemCountNonZero') {
+      list = list.filter(item => (Number(item.itemCount) || 0) !== 0);
     } else if (statusFilter !== 'all') {
-      list = list.filter(item => {
-        const s = (item.status || '').trim();
-        if (statusFilter === '완료') return s === '완료' || s === '주문찾기' || s === '매입처리' || s === '주고옴';
-        if (statusFilter === '미송') return s === '미송' || s === '올미송(결제만)' || s === '미송(찾기)' || s === '찾기';
-        if (statusFilter === '반품') return s === '반품' || s === '반품/교환' || s === '반품만' || s === '교환' || s === '반송';
-        return s === statusFilter;
-      });
+      list = list.filter(item => (item.status || '').trim() === statusFilter);
     }
 
     if (searchQuery.trim()) {
@@ -184,31 +181,22 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = ({
       // 주문, 미송, 반품 버튼이 누른 건은 무조건 완료로 표시하고 완료건수에 포함
       if (isAnyStatus) {
         completedCount++;
+        // 물건 갯수합계: 버튼 종류와 무관하게 사용자가 입력한 숫자를 무조건 그대로 합산
+        totalItemCount += Number(order.itemCount) || 0;
       } else {
         uncompletedCount++;
       }
 
-      // 물건 갯수합계
       if (status === '올미송(결제만)') {
         allMisongCount++;
-        // 올미송(결제만): 물건 갯수합계는 그대로 (0)
       } else if (status === '반품만') {
         returnOnlyCount++;
-        // 반품만: 물건 갯수에는 0 (0)
       } else if (status === '미송(찾기)') {
         misongFindCount++;
-        totalItemCount += (order.itemCount && order.itemCount > 0 ? Number(order.itemCount) : 1);
       } else if (status === '반품/교환' || status === '교환' || status === '반송') {
         returnExchangeCount++;
-        totalItemCount += (order.itemCount && order.itemCount > 0 ? Number(order.itemCount) : 1);
-      } else if (status === '매입처리' || status === '주고옴') {
-        if (status === '매입처리') purchaseCount++;
-        totalItemCount += (order.itemCount ? Number(order.itemCount) : 0);
-      } else if (isAnyStatus) {
-        // 주문찾기, 완료 등
-        totalItemCount += (order.itemCount && order.itemCount > 0 ? Number(order.itemCount) : 1);
-      } else {
-        // 미완료 상태: 수량에 포함하지 않음
+      } else if (status === '매입처리') {
+        purchaseCount++;
       }
 
       totalExpense += Number(order.expense || 0);
@@ -236,20 +224,21 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = ({
     let finalItemCount = tx.itemCount ?? 0;
     let isReturnFlag = tx.isReturn;
 
-    if (targetStatus === '올미송(결제만)') {
-      finalItemCount = 0;
-    } else if (targetStatus === '반품만') {
-      finalItemCount = 0;
+    // 그룹 1: 기본값 1
+    if (['주문찾기', '샘플', '미송(찾기)', '교환', '반송', '완료', '반품/교환'].includes(targetStatus)) {
+      if (!finalItemCount || finalItemCount === 0) {
+        finalItemCount = 1;
+      }
+    } 
+    // 그룹 0: 기본값 0
+    else if (['주문없음', '물건없음', '올미송(결제만)', '반품만', '매입처리', '주고옴'].includes(targetStatus)) {
+      if (!finalItemCount || finalItemCount === 0) {
+        finalItemCount = 0;
+      }
+    }
+
+    if (targetStatus === '반품만' || targetStatus === '반품/교환' || targetStatus === '교환' || targetStatus === '반송') {
       isReturnFlag = true;
-    } else if (targetStatus === '반품/교환' || targetStatus === '교환' || targetStatus === '반송') {
-      finalItemCount = (tx.itemCount && tx.itemCount > 0) ? tx.itemCount : 1;
-      isReturnFlag = true;
-    } else if (targetStatus === '미송(찾기)' || targetStatus === '주문찾기' || targetStatus === '완료') {
-      finalItemCount = (tx.itemCount && tx.itemCount > 0) ? tx.itemCount : 1;
-    } else if (targetStatus === '매입처리' || targetStatus === '주고옴') {
-      finalItemCount = 0;
-    } else if (!targetStatus) {
-      finalItemCount = tx.itemCount ?? 0;
     }
 
     const updatedTx: Transaction = {
@@ -264,8 +253,7 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = ({
     setActiveActionType(null);
 
     // Update local state immediately
-    const updatedList = transactions.map(t => (t.id === tx.id ? updatedTx : t));
-    onTransactionsUpdated(updatedList);
+    onUpdateTransaction(updatedTx);
 
     // Save to Firebase RTDB
     try {
@@ -283,8 +271,7 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = ({
       actualManager: currentUser.name || tx.actualManager || tx.manager
     };
 
-    const updatedList = transactions.map(t => (t.id === tx.id ? updatedTx : t));
-    onTransactionsUpdated(updatedList);
+    onUpdateTransaction(updatedTx);
 
     try {
       await saveOrderToFirebase(updatedTx);
@@ -332,7 +319,7 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = ({
         수량: count,
         반품여부: order.isReturn || order.status === '반품만' || order.status === '반품/교환' || order.status === '교환' || order.status === '반송' ? 'Y' : 'N',
         완료여부: isAnyDone ? order.status : '미완료',
-        대납금: order.expense || 0,
+        대납금: (order.expense || 0) * 1000,
         비고: order.remark || ''
       };
     });
@@ -344,7 +331,7 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = ({
   };
 
   return (
-    <div id="buyerWorkdayScreen" className="fixed inset-0 z-50 overflow-y-auto bg-gray-950 text-gray-100 font-sans p-3 sm:p-4 pb-28 select-none">
+    <div id="buyerWorkdayScreen" className="fixed inset-0 z-50 overflow-y-auto bg-gray-950 text-gray-100 font-sans p-3 sm:p-4 pb-12 select-none">
       <div className="max-w-4xl mx-auto">
         
         {/* Top Header & Navigation */}
@@ -396,7 +383,7 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = ({
 
         {/* Filter Controls (날짜 / 건물 / 층수) */}
         <div className="bg-gray-900 border border-gray-800 p-3 sm:p-4 rounded-xl shadow-lg mb-4 space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             {/* 날짜 */}
             <div>
               <label className="block text-xs font-bold text-gray-400 mb-1 flex items-center gap-1">
@@ -451,24 +438,8 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = ({
               </select>
             </div>
 
-            {/* 상태 */}
-            <div>
-              <label className="block text-xs font-bold text-gray-400 mb-1 flex items-center gap-1">
-                <Filter className="w-3.5 h-3.5 text-blue-400" /> 상태
-              </label>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="w-full bg-gray-800 text-white border border-gray-700 p-2 rounded-lg text-xs font-medium focus:ring-2 focus:ring-blue-500 outline-none"
-              >
-                <option value="all">전체 상태</option>
-                <option value="uncompleted">처리 대기 (미완료)</option>
-                <option value="completed">처리 완료</option>
-              </select>
-            </div>
-
             {/* 검색 */}
-            <div className="sm:col-span-2 md:col-span-1">
+            <div>
               <label className="block text-xs font-bold text-gray-400 mb-1 flex items-center gap-1">
                 <Search className="w-3.5 h-3.5 text-blue-400" /> 검색
               </label>
@@ -498,50 +469,71 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = ({
               <span className="text-gray-400">
                 현재 목록: <b className="text-yellow-400 font-black">{filteredOrders.length}</b>건
                 <span className="text-gray-500 ml-1">
-                  ({statusFilter === 'uncompleted' ? '처리 대기' : statusFilter === 'completed' ? '처리 완료' : '전체'})
+                  ({statusFilter === 'uncompleted' ? '처리 대기' : statusFilter === 'completed' ? '처리 완료' : statusFilter === 'itemCountNonZero' ? '물건 갯수합계' : statusFilter === 'all' ? '전체' : statusFilter})
                 </span>
               </span>
             </div>
             <div className="text-gray-400 text-xs">
-              대납 합계: <b className="text-rose-400 text-sm font-black">{workdayStats.totalExpense.toLocaleString()}</b>원
+              대납 합계: <b className="text-rose-400 text-sm font-black">{formatMoney(workdayStats.totalExpense)}</b>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-center text-xs">
-            <div className="bg-gray-800/80 rounded-lg p-1 border border-gray-700/60">
-              <div className="text-[10px] text-gray-400 font-semibold mb-0.5">총 주문건수</div>
+          <div className="grid grid-cols-4 lg:grid-cols-7 gap-1.5 text-center text-xs">
+            <button 
+              type="button"
+              onClick={() => setStatusFilter('all')}
+              className={`rounded-lg py-1 px-0.5 border transition-all duration-200 cursor-pointer hover:brightness-125 active:scale-95 ${statusFilter === 'all' ? 'bg-gray-700 border-gray-500 ring-1 ring-gray-400 ring-offset-1 ring-offset-gray-900' : 'bg-gray-800/80 border-gray-700/60'}`}>
+              <div className="text-[10px] tracking-tight text-gray-400 font-semibold mb-0.5">총 주문건수</div>
               <div className="text-sm sm:text-base font-black text-white">{workdayStats.totalOrderCount}<span className="text-[10px] font-normal ml-0.5 text-gray-400">건</span></div>
-            </div>
+            </button>
 
-            <div className="bg-emerald-950/40 rounded-lg p-1 border border-emerald-800/60">
-              <div className="text-[10px] text-emerald-300 font-semibold mb-0.5">완료건수</div>
+            <button 
+              type="button"
+              onClick={() => setStatusFilter('completed')}
+              className={`rounded-lg py-1 px-0.5 border transition-all duration-200 cursor-pointer hover:brightness-125 active:scale-95 ${statusFilter === 'completed' ? 'bg-emerald-900 border-emerald-500 ring-1 ring-emerald-400 ring-offset-1 ring-offset-gray-900' : 'bg-emerald-950/40 border-emerald-800/60'}`}>
+              <div className="text-[10px] tracking-tight text-emerald-300 font-semibold mb-0.5">완료건수</div>
               <div className="text-sm sm:text-base font-black text-emerald-400">{workdayStats.completedCount}<span className="text-[10px] font-normal ml-0.5 text-emerald-300">건</span></div>
-            </div>
+            </button>
 
-            <div className="bg-amber-950/40 rounded-lg p-1 border border-amber-800/60">
-              <div className="text-[10px] text-amber-300 font-semibold mb-0.5">처리 대기</div>
+            <button 
+              type="button"
+              onClick={() => setStatusFilter('uncompleted')}
+              className={`rounded-lg py-1 px-0.5 border transition-all duration-200 cursor-pointer hover:brightness-125 active:scale-95 ${statusFilter === 'uncompleted' ? 'bg-amber-900 border-amber-500 ring-1 ring-amber-400 ring-offset-1 ring-offset-gray-900' : 'bg-amber-950/40 border-amber-800/60'}`}>
+              <div className="text-[10px] tracking-tight text-amber-300 font-semibold mb-0.5">처리 대기</div>
               <div className="text-sm sm:text-base font-black text-amber-400">{workdayStats.uncompletedCount}<span className="text-[10px] font-normal ml-0.5 text-amber-300">건</span></div>
-            </div>
+            </button>
 
-            <div className="bg-cyan-950/40 rounded-lg p-1 border border-cyan-800/60">
-              <div className="text-[10px] text-cyan-300 font-semibold mb-0.5">물건 갯수합계</div>
+            <button 
+              type="button"
+              onClick={() => setStatusFilter('itemCountNonZero')}
+              className={`rounded-lg py-1 px-0.5 border transition-all duration-200 cursor-pointer hover:brightness-125 active:scale-95 ${statusFilter === 'itemCountNonZero' ? 'bg-cyan-900 border-cyan-500 ring-1 ring-cyan-400 ring-offset-1 ring-offset-gray-900' : 'bg-cyan-950/40 border-cyan-800/60'}`}>
+              <div className="text-[10px] tracking-tight text-cyan-300 font-semibold mb-0.5">물건 갯수합계</div>
               <div className="text-sm sm:text-base font-black text-cyan-400">{workdayStats.totalItemCount}<span className="text-[10px] font-normal ml-0.5 text-cyan-300">개</span></div>
-            </div>
+            </button>
 
-            <div className="bg-yellow-950/40 rounded-lg p-1 border border-yellow-800/60">
-              <div className="text-[10px] text-yellow-300 font-semibold mb-0.5">올미송(결제만)</div>
+            <button 
+              type="button"
+              onClick={() => setStatusFilter('올미송(결제만)')}
+              className={`rounded-lg py-1 px-0.5 border transition-all duration-200 cursor-pointer hover:brightness-125 active:scale-95 ${statusFilter === '올미송(결제만)' ? 'bg-yellow-900 border-yellow-500 ring-1 ring-yellow-400 ring-offset-1 ring-offset-gray-900' : 'bg-yellow-950/40 border-yellow-800/60'}`}>
+              <div className="text-[10px] tracking-tight text-yellow-300 font-semibold mb-0.5">올미송(결제만)</div>
               <div className="text-sm sm:text-base font-black text-yellow-400">{workdayStats.allMisongCount}<span className="text-[10px] font-normal ml-0.5 text-yellow-300">건</span></div>
-            </div>
+            </button>
 
-            <div className="bg-rose-950/40 rounded-lg p-1 border border-rose-800/60">
-              <div className="text-[10px] text-rose-300 font-semibold mb-0.5">반품만</div>
+            <button 
+              type="button"
+              onClick={() => setStatusFilter('반품만')}
+              className={`rounded-lg py-1 px-0.5 border transition-all duration-200 cursor-pointer hover:brightness-125 active:scale-95 ${statusFilter === '반품만' ? 'bg-rose-900 border-rose-500 ring-1 ring-rose-400 ring-offset-1 ring-offset-gray-900' : 'bg-rose-950/40 border-rose-800/60'}`}>
+              <div className="text-[10px] tracking-tight text-rose-300 font-semibold mb-0.5">반품만</div>
               <div className="text-sm sm:text-base font-black text-rose-400">{workdayStats.returnOnlyCount}<span className="text-[10px] font-normal ml-0.5 text-rose-300">건</span></div>
-            </div>
+            </button>
 
-            <div className="bg-purple-950/40 rounded-lg p-1 border border-purple-800/60">
-              <div className="text-[10px] text-purple-300 font-semibold mb-0.5">매입</div>
+            <button 
+              type="button"
+              onClick={() => setStatusFilter('매입처리')}
+              className={`rounded-lg py-1 px-0.5 border transition-all duration-200 cursor-pointer hover:brightness-125 active:scale-95 ${statusFilter === '매입처리' ? 'bg-purple-900 border-purple-500 ring-1 ring-purple-400 ring-offset-1 ring-offset-gray-900' : 'bg-purple-950/40 border-purple-800/60'}`}>
+              <div className="text-[10px] tracking-tight text-purple-300 font-semibold mb-0.5">매입</div>
               <div className="text-sm sm:text-base font-black text-purple-400">{workdayStats.purchaseCount}<span className="text-[10px] font-normal ml-0.5 text-purple-300">건</span></div>
-            </div>
+            </button>
           </div>
         </div>
 
@@ -555,7 +547,7 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = ({
             filteredOrders.map(order => {
               const statusStr = (order.status || '').trim();
               const isAnyCompleted = statusStr !== '';
-              const isOrderComplete = statusStr === '완료' || statusStr === '주문찾기' || statusStr === '매입처리' || statusStr === '주고옴';
+              const isOrderComplete = statusStr === '완료' || statusStr === '주문찾기' || statusStr === '매입처리' || statusStr === '주고옴' || statusStr === '샘플' || statusStr === '주문없음' || statusStr === '물건없음';
               const isPending = statusStr === '미송' || statusStr === '올미송(결제만)' || statusStr === '미송(찾기)' || statusStr === '찾기';
               const isReturn = statusStr === '반품' || statusStr === '반품/교환' || statusStr === '반품만' || statusStr === '교환' || statusStr === '반송';
 
@@ -578,7 +570,7 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = ({
                         {String(order.floor || '').replace(/층$/, '') ? `${String(order.floor || '').replace(/층$/, '')}층` : ''}
                       </span>
                       <span className="text-white ml-1 font-mono">
-                        {order.room ? `${order.room}호` : ''}
+                        {String(order.room || '').replace(/호$/, '') ? `${String(order.room || '').replace(/호$/, '')}호` : ''}
                       </span>
                     </div>
 
@@ -613,9 +605,8 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = ({
                     </div>
 
                     <div className="flex gap-2 items-end shrink-0">
-                      <div className="flex flex-col items-center">
-                        <div className="flex w-full justify-between items-center mb-0.5 px-0.5">
-                          <label className="text-[10px] text-gray-400 font-semibold shrink-0">물건 갯수</label>
+                      <div className="flex flex-col items-end">
+                        <div className="mb-1">
                           <div className="flex items-center gap-1">
                             <input 
                               type="checkbox" 
@@ -626,37 +617,41 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = ({
                             <label className="text-[10px] text-red-400 font-semibold cursor-pointer" onClick={(e) => { e.preventDefault(); handleUpdateField(order, 'isReturn', !order.isReturn); }}>반품있음</label>
                           </div>
                         </div>
-                        <input
-                          type="number"
-                          value={order.itemCount ?? 0}
-                          onChange={(e) => {
-                             // Update local state directly for responsive UI
-                             const newList = transactions.map(t => t.id === order.id ? {...t, itemCount: Number(e.target.value)} : t);
-                             onTransactionsUpdated(newList);
-                          }}
-                          onBlur={(e) => handleUpdateField(order, 'itemCount', e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              (e.target as HTMLInputElement).blur();
-                            }
-                          }}
-                          className="bg-gray-800 text-white border border-gray-700 w-12 sm:w-16 p-1.5 rounded-lg text-center font-black text-sm sm:text-base outline-none focus:ring-2 focus:ring-blue-500"
-                        />
+                        <div className="flex items-center gap-2">
+                          <label className="text-sm text-gray-300 font-bold shrink-0">물건갯수</label>
+                          <input
+                            type="number"
+                            value={order.itemCount ?? 0}
+                            onChange={(e) => {
+                               onUpdateTransaction({...order, itemCount: Number(e.target.value)});
+                            }}
+                            onBlur={(e) => handleUpdateField(order, 'itemCount', e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                (e.target).blur();
+                              }
+                            }}
+                            className="bg-gray-800 text-white border border-gray-700 w-14 sm:w-16 p-1.5 rounded-lg text-center font-black text-sm sm:text-base outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
                       </div>
                       <div className="flex flex-col items-end">
                         <label className="text-[10px] text-gray-400 mb-0.5 font-semibold">대납금</label>
-                        <input
-                          type="text"
-                          defaultValue={order.expense ? order.expense.toLocaleString() : ''}
-                          onBlur={(e) => handleUpdateField(order, 'expense', e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              (e.target as HTMLInputElement).blur();
-                            }
-                          }}
-                          placeholder="금액입력"
-                          className="bg-gray-800 text-amber-400 border border-gray-700 w-24 sm:w-28 p-1.5 rounded-lg text-right font-black text-sm sm:text-base outline-none focus:ring-2 focus:ring-amber-500"
-                        />
+                        <div className="relative flex items-center">
+                          <input
+                            type="text"
+                            defaultValue={order.expense ? order.expense.toLocaleString() : ''}
+                            onBlur={(e) => handleUpdateField(order, 'expense', e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                (e.target as HTMLInputElement).blur();
+                              }
+                            }}
+                            placeholder="입력"
+                            className="bg-gray-800 text-amber-400 border border-gray-700 w-28 sm:w-32 p-1.5 pr-10 rounded-lg text-right font-black text-sm sm:text-base outline-none focus:ring-2 focus:ring-amber-500"
+                          />
+                          <span className="absolute right-2 text-gray-400 text-xs font-medium pointer-events-none">,000원</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -680,21 +675,12 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = ({
                   {/* Status Buttons (완료 / 미송 / 반품) */}
                   <div className="pt-2 border-t border-gray-800 flex flex-col gap-2">
                     {activeActionId === order.id && activeActionType === '주문' ? (
-                      <div className="flex space-x-2">
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateStatus(order, '주문찾기')}
-                          className="flex-1 py-2 rounded-lg text-xs font-bold border transition bg-green-600 border-green-500 text-white shadow-md hover:bg-green-500"
-                        >
-                          주문찾기
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setActiveActionId(null); setActiveActionType(null); }}
-                          className="px-3 py-2 rounded-lg text-xs font-bold border transition bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
-                        >
-                          취소
-                        </button>
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" onClick={() => handleUpdateStatus(order, '주문찾기')} className="flex-1 min-w-[60px] py-2 rounded-lg text-[11px] font-bold border transition bg-green-600 border-green-500 text-white shadow-md hover:bg-green-500">주문찾기</button>
+                        <button type="button" onClick={() => handleUpdateStatus(order, '샘플')} className="flex-1 min-w-[50px] py-2 rounded-lg text-[11px] font-bold border transition bg-teal-600 border-teal-500 text-white shadow-md hover:bg-teal-500">샘플</button>
+                        <button type="button" onClick={() => handleUpdateStatus(order, '주문없음')} className="flex-1 min-w-[60px] py-2 rounded-lg text-[11px] font-bold border transition bg-slate-600 border-slate-500 text-white shadow-md hover:bg-slate-500">주문없음</button>
+                        <button type="button" onClick={() => handleUpdateStatus(order, '물건없음')} className="flex-1 min-w-[60px] py-2 rounded-lg text-[11px] font-bold border transition bg-slate-600 border-slate-500 text-white shadow-md hover:bg-slate-500">물건없음</button>
+                        <button type="button" onClick={() => { setActiveActionId(null); setActiveActionType(null); }} className="px-3 py-2 rounded-lg text-[11px] font-bold border transition bg-gray-700 border-gray-600 text-white hover:bg-gray-600">취소</button>
                       </div>
                     ) : activeActionId === order.id && activeActionType === '미송' ? (
                       <div className="flex space-x-2">
@@ -797,6 +783,7 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = ({
 
                         <button
     type="button"
+    disabled={!order.isReturn && !isReturn}
     onClick={() => {
       if (isReturn) handleUpdateStatus(order, '');
       else { setActiveActionId(order.id); setActiveActionType('반품'); }
@@ -804,7 +791,9 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = ({
     className={`flex-1 py-2 rounded-lg text-xs font-bold border transition ${
       isReturn
         ? 'bg-red-600 border-red-500 ring-2 ring-red-400 text-white shadow-md'
-        : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-white hover:bg-gray-700'
+        : !order.isReturn 
+          ? 'bg-gray-900 border-gray-800 text-gray-600 opacity-50 cursor-not-allowed'
+          : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-white hover:bg-gray-700'
     }`}
   >
     {isReturn ? order.status : '반품'}
@@ -818,21 +807,19 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = ({
           )}
         </div>
 
-      </div>
-
-      {/* Bottom Fixed Excel Download Bar */}
-      <div className="fixed bottom-0 left-0 right-0 p-3 sm:p-4 bg-gray-900/95 backdrop-blur-md border-t border-gray-800 z-50 shadow-2xl">
-        <div className="max-w-4xl mx-auto flex items-center gap-3">
+        {/* Bottom Excel Download Button (Not Fixed) */}
+        <div className="mt-6">
           <button
             type="button"
             onClick={handleDownloadExcel}
-            className="flex-1 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white py-3 px-4 rounded-xl font-bold shadow-lg text-sm sm:text-base transition flex items-center justify-center gap-2"
+            className="w-full bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white py-3 px-4 rounded-xl font-bold shadow-md text-sm sm:text-base transition flex items-center justify-center gap-2"
           >
             <Download className="w-5 h-5" />
-            수정된 최종 엑셀 다운로드 ({selectedDateStr})
+            최종 엑셀 다운로드 ({selectedDateStr})
           </button>
         </div>
+
       </div>
     </div>
   );
-};
+});

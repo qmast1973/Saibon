@@ -154,6 +154,27 @@ function openLedgerDB(): Promise<IDBDatabase> {
   });
 }
 
+
+export async function updateTransactionInIndexedDB(item: Transaction): Promise<void> {
+  const db = await openLedgerDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, 'readwrite');
+    const store = tx.objectStore(DB_STORE);
+    store.put({
+      ...item,
+      market: normalizeMarketName(item.market)
+    });
+    tx.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    tx.onerror = () => {
+      db.close();
+      reject(tx.error);
+    };
+  });
+}
+
 export async function saveTransactionsToIndexedDB(data: Transaction[]): Promise<void> {
   const db = await openLedgerDB();
   return new Promise((resolve, reject) => {

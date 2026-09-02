@@ -10,7 +10,7 @@ interface FullLedgerViewProps {
   onDeleteTransaction: (id: string) => void;
 }
 
-export const FullLedgerView: React.FC<FullLedgerViewProps> = ({
+export const FullLedgerView: React.FC<FullLedgerViewProps> = React.memo(({
   transactions,
   currentUser,
   onEditTransaction,
@@ -98,7 +98,7 @@ export const FullLedgerView: React.FC<FullLedgerViewProps> = ({
                   <td className="p-3 text-slate-500 whitespace-nowrap">{t.region || '-'}</td>
                   <td className="p-3 font-bold text-slate-900 whitespace-nowrap">{t.store || '-'}</td>
                   <td className="p-3 text-slate-600 whitespace-nowrap">
-                    <b>{t.market || ''}</b> {t.floor ? `${t.floor}층` : ''} {t.room || ''}
+                    <b>{t.market || ''}</b> {String(t.floor || '').replace(/층$/, '') ? `${String(t.floor || '').replace(/층$/, '')}층` : ''} {String(t.room || '').replace(/호$/, '') ? `${String(t.room || '').replace(/호$/, '')}호` : ''}
                   </td>
                   <td className="p-3 text-right font-semibold text-rose-600 whitespace-nowrap font-mono">
                     {formatMoney(t.expense)}
@@ -195,4 +195,4 @@ export const FullLedgerView: React.FC<FullLedgerViewProps> = ({
       )}
     </section>
   );
-};
+});

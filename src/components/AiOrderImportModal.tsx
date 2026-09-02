@@ -14,23 +14,16 @@ interface AiOrderImportModalProps {
 
 const SAMPLE_PRESETS = [
   {
-    title: '카톡 줄임말 & 은어',
-    text: `1. 디 3-12 쵸이마켓 바지 2장 (샘플)
-2. APM 7F 45 아워룸 픽업요망
-3. 청 B1 33 청춘 5만원 입금요망
-4. 디클 2층 15호 미니샵`
-  },
-  {
     title: '상호 그룹형 주문',
-    text: `[초록밀크]
+    text: `[초코송이마켓]
 디오트 3층 12호
 청평화 1층 가동 5호 니트 1개
 퀸즈스퀘어 4층 102호 스커트`
   },
   {
     title: '슬래시(/) 분할형',
-    text: `쵸이 / 디오트 / 3층 / 12호 / 샘플픽업
-리썸 / APM플레이스 / 7층 / 45호 / 단가 15000`
+    text: `블루문 / 디오트 / 3층 / 12호 / 샘플픽업
+오렌지박스 / APM플레이스 / 7층 / 45호 / 단가 15000`
   }
 ];
 
@@ -112,7 +105,7 @@ export const AiOrderImportModal: React.FC<AiOrderImportModalProps> = ({
           actualManager: currentUser?.name || '',
           expense: 0,
           income: 0,
-          status: '미완료',
+          status: '',
           remark,
           recordType: market === '미수금' ? 'receivable' : 'order',
           importedFromFirebase: true
@@ -133,7 +126,7 @@ export const AiOrderImportModal: React.FC<AiOrderImportModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
+    <div className="fixed inset-0 z-[210] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
       <div className="bg-gray-900 rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl border border-gray-800 animate-slide-up flex flex-col max-h-[92vh]">
         
         {/* Header */}
@@ -201,7 +194,7 @@ export const AiOrderImportModal: React.FC<AiOrderImportModalProps> = ({
               </div>
               <textarea
                 className="w-full h-56 lg:h-80 bg-gray-950 border border-gray-800 rounded-xl p-3.5 text-xs sm:text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none font-mono leading-relaxed transition-all"
-                placeholder={`카톡이나 문자 주문을 여기에 편하게 붙여넣으세요!\n\n예시 1:\n디 3-12 쵸이마켓 바지 2장\nAPM 7F 45 아워룸 픽업요망\n청 B1-5 리썸\n\n예시 2:\n쵸이/디오트/3층/12호/샘플`}
+                placeholder={`카톡이나 문자 주문을 여기에 편하게 붙여넣으세요!\n\n예시 1:\n디 3-12 구름상회 바지 2장\nAPM 7F 45 은하수어패럴 픽업요망\n청 B1-5 오렌지박스\n\n예시 2:\n블루문/디오트/3층/12호/샘플`}
                 value={textInput}
                 onChange={(e) => setTextInput(e.target.value)}
                 disabled={isProcessing}

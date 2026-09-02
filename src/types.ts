@@ -78,3 +78,21 @@ export interface CollectionGroupRule {
   systemDefault?: boolean;
   createdAt?: string;
 }
+
+export interface BoardComment {
+  id: string;
+  content: string;
+  authorName: string;
+  authorUsername: string;
+  createdAt: string;
+}
+
+export interface BoardPost {
+  id: string;
+  title: string;
+  content: string;
+  authorName: string;
+  authorUsername: string;
+  createdAt: string; // ISO date string
+  comments?: Record<string, Omit<BoardComment, 'id'>>;
+}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Transaction, User } from '../types';
 import { saveOrderToFirebase, normalizeMarketName } from '../lib/firebase';
-import { Plus, Trash2, Edit3, X, Check } from 'lucide-react';
+import { Plus, Trash2, Edit3, X, Check, Sparkles } from 'lucide-react';
 
 interface OrderEntryModalProps {
   editingTransaction: Transaction | null;
@@ -12,6 +12,7 @@ interface OrderEntryModalProps {
   onClose: () => void;
   onOrderSaved: (savedOrders: Transaction[]) => void;
   onOrderCompleted?: (transactionId: string) => void;
+  onOpenAiModal?: () => void;
 }
 
 interface OrderRowItem {
@@ -28,7 +29,8 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
   allMarkets,
   onClose,
   onOrderSaved,
-  onOrderCompleted
+  onOrderCompleted,
+  onOpenAiModal
 }) => {
   const isEditMode = !!editingTransaction;
   const isMerchant = currentUser?.role === 'merchant';
@@ -177,10 +179,22 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
         
         {/* Header */}
         <div className="bg-indigo-900 text-white px-5 py-4 flex items-center justify-between shrink-0">
-          <h3 className="font-bold text-base flex items-center gap-2">
-            <Plus className="w-5 h-5 text-indigo-300" />
-            {isEditMode ? '사입 주문 수정 / 완료 처리' : '신규 사입 주문 입력'}
-          </h3>
+          <div className="flex items-center gap-3">
+            <h3 className="font-bold text-base flex items-center gap-2">
+              <Plus className="w-5 h-5 text-indigo-300" />
+              {isEditMode ? '사입 주문 수정 / 완료 처리' : '신규 사입 주문 입력'}
+            </h3>
+            {!isEditMode && onOpenAiModal && (
+              <button
+                type="button"
+                onClick={onOpenAiModal}
+                className="bg-indigo-700 hover:bg-indigo-600 text-indigo-100 text-[10px] font-bold px-2 py-1.5 rounded flex items-center gap-1 transition border border-indigo-500/50"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+                스마트 입력
+              </button>
+            )}
+          </div>
           <button type="button" onClick={onClose} className="text-slate-300 hover:text-white p-1">
             <X className="w-5 h-5" />
           </button>
@@ -309,7 +323,7 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
                   <div key={i} className="flex items-center gap-2 py-0.5 border-b border-slate-200 last:border-b-0">
                     <span className="font-bold text-slate-400 w-4">{i + 1}.</span>
                     <span className="font-semibold text-slate-800">{r.market || '-'}</span>
-                    <span>{r.floor ? `${r.floor}층` : ''}</span>
+                    <span>{String(r.floor || '').replace(/층$/, '') ? `${String(r.floor || '').replace(/층$/, '')}층` : ''}</span>
                     <span>{r.room ? `${r.room}` : ''}</span>
                   </div>
                 ))
