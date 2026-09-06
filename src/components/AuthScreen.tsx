@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
 import { convertKoreanToEnglish } from '../lib/keyboard';
 import {
@@ -46,12 +46,27 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loginMessage, setLoginMessage] = useState<{ text: string; isError: boolean } | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [saveId, setSaveId] = useState(false);
+  const [autoLogin, setAutoLogin] = useState(false);
+
+  useEffect(() => {
+    const savedId = localStorage.getItem("savedIdentifier");
+    if (savedId) {
+      setLoginIdentifier(savedId);
+      setSaveId(true);
+    }
+    const savedAutoLogin = localStorage.getItem("savedAutoLogin");
+    if (savedAutoLogin === "true") {
+      setAutoLogin(true);
+    }
+  }, []);
 
   // Register form state
   const [regEmail, setRegEmail] = useState('');
   const [regUsername, setRegUsername] = useState('');
   const [regRole, setRegRole] = useState<UserRole>('merchant');
   const [regStoreName, setRegStoreName] = useState('');
+  const [regBusinessNumber, setRegBusinessNumber] = useState('');
   const [regName, setRegName] = useState('');
   const [regRegion, setRegRegion] = useState('');
   const [regAddress, setRegAddress] = useState('');
@@ -82,6 +97,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         setIsLoggingIn(false);
         return;
       }
+
+      if (saveId) {
+        localStorage.setItem("savedIdentifier", identifier);
+      } else {
+        localStorage.removeItem("savedIdentifier");
+      }
+      localStorage.setItem("savedAutoLogin", autoLogin ? "true" : "false");
 
       const { user } = await firebaseSignIn(identifier, loginPassword, users);
 
@@ -131,6 +153,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     const name = regName.trim();
     const phone = regPhone.trim();
     const storeName = regRole === 'merchant' ? regStoreName.trim() : '';
+    const businessNumber = regRole === 'merchant' ? regBusinessNumber.trim() : '';
     const address = regRole === 'merchant' ? regAddress.trim() : '';
     const assignedRegion = regRole === 'local' ? regRegion.trim() : '';
 
@@ -190,6 +213,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         phone,
         role: regRole,
         storeName,
+        businessNumber,
         address,
         assignedRegion
       });
@@ -201,6 +225,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
       // Reset form and switch to login with pre-filled email
       setRegStoreName('');
+      setRegBusinessNumber('');
       setRegName('');
       setRegAddress('');
       setRegUsername('');
@@ -396,6 +421,30 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                       {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
+
+                <div className="flex items-center justify-between mt-2">
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-1.5 cursor-pointer text-xs text-slate-600 font-medium hover:text-slate-800">
+                      <input 
+                        type="checkbox" 
+                        checked={saveId} 
+                        onChange={(e) => setSaveId(e.target.checked)} 
+                        className="w-3.5 h-3.5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" 
+                      />
+                      아이디 저장
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer text-xs text-slate-600 font-medium hover:text-slate-800">
+                      <input 
+                        type="checkbox" 
+                        checked={autoLogin} 
+                        onChange={(e) => setAutoLogin(e.target.checked)} 
+                        className="w-3.5 h-3.5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" 
+                      />
+                      자동 로그인
+                    </label>
+                  </div>
+                </div>
+
                 </div>
 
                 <button

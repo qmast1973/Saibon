@@ -1,5 +1,6 @@
 import React from 'react';
 import { User } from '../types';
+import { PWAInstallButton } from './PWAInstallButton';
 import { Database, Calculator, Store, LogOut, Users, HandCoins, MessageSquare } from 'lucide-react';
 
 interface NavbarProps {
@@ -89,6 +90,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           
           {/* Top Right: User Info & Logout */}
           <div className="flex items-center gap-1.5 sm:gap-2 pt-0.5">
+            <PWAInstallButton />
             {onOpenBoard && (
               <button
                 type="button"

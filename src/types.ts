@@ -13,6 +13,7 @@ export interface User {
   storeName?: string; // For merchant
 
   address?: string; // For merchant delivery address
+  businessNumber?: string;
   assignedRegion?: string; // For local manager (e.g. 합성동)
   allowedMarkets?: string[]; // For buyer (e.g. 디오트, APM, etc.)
   assignedMerchants?: string[]; // For local manager (usernames of merchants)

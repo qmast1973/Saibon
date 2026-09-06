@@ -83,7 +83,7 @@ export async function getSessionUser(): Promise<User | null> {
       req.onerror = () => reject(req.error);
     });
     db.close();
-    if (!saved || !saved.user || !saved.loginAt) return null;
+    if (!saved || !saved.user || !saved.loginAt) throw new Error("Not found in IDB");
     if (Date.now() - Number(saved.loginAt) >= AUTO_LOGIN_TIMEOUT) {
       await clearSessionUser();
       return null;
@@ -91,7 +91,7 @@ export async function getSessionUser(): Promise<User | null> {
     return saved.user;
   } catch {
     try {
-      const raw = localStorage.getItem(AUTO_LOGIN_KEY);
+      const raw = sessionStorage.getItem(AUTO_LOGIN_KEY) || localStorage.getItem(AUTO_LOGIN_KEY);
       if (!raw) return null;
       const saved = JSON.parse(raw);
       if (!saved || !saved.user || !saved.loginAt || Date.now() - Number(saved.loginAt) >= AUTO_LOGIN_TIMEOUT) {
@@ -106,19 +106,39 @@ export async function getSessionUser(): Promise<User | null> {
 }
 
 export async function setSessionUser(user: User, loginAt = Date.now()): Promise<void> {
+  const autoLogin = localStorage.getItem("savedAutoLogin") === "true";
   const record = { id: 'current', user, loginAt };
   try {
-    const db = await openAuthDB();
-    await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(AUTO_SESSION_STORE, 'readwrite');
-      tx.objectStore(AUTO_SESSION_STORE).put(record);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-    db.close();
+    if (autoLogin) {
+      const db = await openAuthDB();
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(AUTO_SESSION_STORE, 'readwrite');
+        tx.objectStore(AUTO_SESSION_STORE).put(record);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+      db.close();
+    } else {
+      // Clear IDB just in case
+      try {
+        const db = await openAuthDB();
+        await new Promise<void>((resolve) => {
+          const tx = db.transaction(AUTO_SESSION_STORE, 'readwrite');
+          tx.objectStore(AUTO_SESSION_STORE).delete('current');
+          tx.oncomplete = () => resolve();
+        });
+        db.close();
+      } catch {}
+    }
   } catch {}
   try {
-    localStorage.setItem(AUTO_LOGIN_KEY, JSON.stringify({ user, loginAt }));
+    if (autoLogin) {
+      localStorage.setItem(AUTO_LOGIN_KEY, JSON.stringify({ user, loginAt }));
+      sessionStorage.removeItem(AUTO_LOGIN_KEY);
+    } else {
+      localStorage.removeItem(AUTO_LOGIN_KEY);
+      sessionStorage.setItem(AUTO_LOGIN_KEY, JSON.stringify({ user, loginAt }));
+    }
   } catch {}
 }
 
@@ -135,6 +155,7 @@ export async function clearSessionUser(): Promise<void> {
   } catch {}
   try {
     localStorage.removeItem(AUTO_LOGIN_KEY);
+    sessionStorage.removeItem(AUTO_LOGIN_KEY);
   } catch {}
 }
 
