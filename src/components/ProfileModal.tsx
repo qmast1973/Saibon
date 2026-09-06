@@ -30,6 +30,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
   const [storeName, setStoreName] = useState(user?.storeName || '');
+  const [businessNumber, setBusinessNumber] = useState(user?.businessNumber || '');
   const [address, setAddress] = useState(user?.address || '');
   const [region, setRegion] = useState(user?.assignedRegion || '');
   const [phone, setPhone] = useState(user?.phone || '');
@@ -48,6 +49,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       setName(user.name || '');
       setEmail(user.email || '');
       setStoreName(user.storeName || '');
+      setBusinessNumber(user.businessNumber || '');
       setAddress(user.address || '');
       setRegion(user.assignedRegion || '');
       setPhone(user.phone || '');
@@ -139,6 +141,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         name: name.trim(),
         email: email.trim().toLowerCase(),
         storeName: role === 'merchant' ? storeName.trim() : '',
+        businessNumber: role === 'merchant' ? businessNumber.trim() : '',
         address: role === 'merchant' ? address.trim() : '',
         assignedRegion: role === 'local' ? region.trim() : '',
         allowedMarkets: role === 'buyer' ? allowedMarkets : [],
@@ -238,6 +241,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   required
                   value={storeName}
                   onChange={(e) => setStoreName(e.target.value)}
+                  className="w-full border border-slate-300 rounded-xl p-2.5 bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">사업자등록번호</label>
+                <input
+                  type="text"
+                  value={businessNumber}
+                  onChange={(e) => setBusinessNumber(e.target.value)}
+                  placeholder="예: 123-45-67890"
                   className="w-full border border-slate-300 rounded-xl p-2.5 bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none focus:bg-white"
                 />
               </div>

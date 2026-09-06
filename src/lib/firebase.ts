@@ -236,6 +236,7 @@ export async function firebaseSignUp(params: SignUpParams): Promise<User> {
     role: params.role,
     approved: params.role === 'admin', // Admin auto-approves, others wait for approval
     storeName: params.role === 'merchant' ? (params.storeName || '').trim() : '',
+    businessNumber: params.role === 'merchant' ? (params.businessNumber || '').trim() : '',
     address: params.role === 'merchant' ? (params.address || '').trim() : '',
     assignedRegion: params.role === 'local' ? (params.assignedRegion || '').trim() : '',
     allowedMarkets: params.allowedMarkets || [],

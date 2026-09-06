@@ -522,18 +522,32 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 </div>
 
                 {regRole === 'merchant' && (
-                  <div id="regStoreNameWrap">
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">상호명 *</label>
-                    <input
-                      id="regStoreName"
-                      type="text"
-                      required
-                      value={regStoreName}
-                      onChange={(e) => setRegStoreName(e.target.value)}
-                      placeholder="예: 초록밀크, 리썸"
-                      className="w-full border border-slate-300 rounded-xl p-2.5 text-xs bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
-                    />
-                  </div>
+                  <>
+                    <div id="regStoreNameWrap">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">상호명 *</label>
+                      <input
+                        id="regStoreName"
+                        type="text"
+                        required
+                        value={regStoreName}
+                        onChange={(e) => setRegStoreName(e.target.value)}
+                        placeholder="예: 초록밀크, 리썸"
+                        className="w-full border border-slate-300 rounded-xl p-2.5 text-xs bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
+                      />
+                    </div>
+
+                    <div id="regBusinessNumberWrap">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">사업자등록번호</label>
+                      <input
+                        id="regBusinessNumber"
+                        type="text"
+                        value={regBusinessNumber}
+                        onChange={(e) => setRegBusinessNumber(e.target.value)}
+                        placeholder="예: 123-45-67890"
+                        className="w-full border border-slate-300 rounded-xl p-2.5 text-xs bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
+                      />
+                    </div>
+                  </>
                 )}
 
                 <div>

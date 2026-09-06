@@ -53,6 +53,9 @@ export const LocalMerchantInfoModal: React.FC<LocalMerchantInfoModalProps> = ({
                 </div>
                 <div className="mt-2 text-slate-600 space-y-1">
                   <div>대표자: <b className="text-slate-800">{m.name || '-'}</b></div>
+                  {m.businessNumber && (
+                    <div className="text-slate-700">사업자: <span className="font-mono text-slate-800">{m.businessNumber}</span></div>
+                  )}
                   {m.phone && (
                     <div className="flex items-center gap-1.5 text-slate-700">
                       <Phone className="w-3.5 h-3.5 text-emerald-600" />

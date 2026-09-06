@@ -243,6 +243,7 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
                             </span>
                           )}
                           <span>전화: {user.phone || '미등록'}</span>
+                          {user.businessNumber && <span>사업자: {user.businessNumber}</span>}
                           {user.address && <span>주소: {user.address}</span>}
                           {user.assignedRegion && <span className="text-violet-700 font-semibold">담당지역: {user.assignedRegion}</span>}
                           {user.allowedMarkets && user.allowedMarkets.length > 0 && (
