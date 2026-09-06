@@ -6,6 +6,7 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    base: './', // GitHub Pages 호스팅을 위한 상대 경로 설정
     plugins: [react(), tailwindcss(), 
     VitePWA({
       registerType: 'autoUpdate',
