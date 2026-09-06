@@ -179,6 +179,7 @@ export interface SignUpParams {
   phone: string;
   role: UserRole;
   storeName?: string;
+  businessNumber?: string;
   address?: string;
   assignedRegion?: string;
   allowedMarkets?: string[];
