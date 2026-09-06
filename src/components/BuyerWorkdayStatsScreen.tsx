@@ -23,7 +23,8 @@ import {
   Filter,
   UserCheck,
   Plus,
-  RefreshCw
+  RefreshCw,
+  FileSpreadsheet
 } from 'lucide-react';
 
 interface BuyerWorkdayStatsScreenProps {
@@ -329,36 +330,37 @@ export const BuyerWorkdayStatsScreen: React.FC<BuyerWorkdayStatsScreenProps> = R
 
 
 
-  // Download Modified Final Excel
-  const handleDownloadExcel = () => {
-    const exportList = statusFilter === 'uncompleted' ? scopeOrders : filteredOrders;
-    if (exportList.length === 0) {
-      alert('다운로드할 데이터가 없습니다.');
+  // Download/Save Excel specifically for the selected date
+  const handleExportSelectedDateExcel = () => {
+    if (dateOrders.length === 0) {
+      alert(`선택한 날짜(${selectedDateStr})에 저장할 데이터가 없습니다.`);
       return;
     }
 
-    const finalExport = exportList.map(order => {
+    const finalExport = dateOrders.map(order => {
       const isAnyDone = !!(order.status || '').trim();
       const count = Number(order.itemCount ?? 0);
       return {
         날짜: order.date || order.businessDate || selectedDateStr,
-        상호: order.store || '',
-        건물명: order.market || '',
+        담당자: order.actualManager || order.assignedManager || order.manager || currentUser.name || '',
+        지역: order.region || '',
+        소매상호: order.store || '',
+        도매건물: order.market || '',
         층: order.floor || '',
         호수: order.room || '',
-        담당: order.actualManager || order.assignedManager || order.manager || '',
         수량: count,
+        대납금: Number((order.expense || 0) * 1000),
+        입금액: Number((order.income || 0) * 1000),
+        처리상태: isAnyDone ? order.status : '미완료',
         반품여부: order.isReturn || ['반품만', '반품/교환', '교환', '반송', '교환매입', '교환 매입', '교환/매입'].includes(order.status || '') ? 'Y' : 'N',
-        완료여부: isAnyDone ? order.status : '미완료',
-        대납금: (order.expense || 0) * 1000,
         비고: order.remark || ''
       };
     });
 
     const worksheet = XLSX.utils.json_to_sheet(finalExport);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, '사입데이터');
-    XLSX.writeFile(workbook, `사입완료_${selectedDateStr}.xlsx`);
+    XLSX.utils.book_append_sheet(workbook, worksheet, `${selectedDateStr}_사입데이터`);
+    XLSX.writeFile(workbook, `사입ON_${selectedDateStr}_사입데이터.xlsx`);
   };
 
   return (
@@ -380,11 +382,21 @@ export const BuyerWorkdayStatsScreen: React.FC<BuyerWorkdayStatsScreenProps> = R
           </div>
 
           <div className="flex items-center gap-2">
-            
+            <button
+              id="btnTopExportExcelStats"
+              type="button"
+              onClick={handleExportSelectedDateExcel}
+              className="bg-emerald-700 hover:bg-emerald-600 active:bg-emerald-800 text-white py-2 px-3 rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-sm cursor-pointer"
+              title="선택한 날짜 엑셀 데이터 저장"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>엑셀데이터 저장</span>
+            </button>
+
             <button
               type="button"
               onClick={onStartEnteringOrder}
-              className="bg-gray-800 hover:bg-gray-700 active:bg-gray-600 text-gray-200 py-2 px-3 rounded-lg text-xs font-bold border border-gray-700 transition flex items-center gap-1"
+              className="bg-gray-800 hover:bg-gray-700 active:bg-gray-600 text-gray-200 py-2 px-3 rounded-lg text-xs font-bold border border-gray-700 transition flex items-center gap-1 cursor-pointer"
               title="달력 화면으로 이동"
             >
               <LayoutGrid className="w-3.5 h-3.5 text-indigo-400" />
@@ -394,7 +406,7 @@ export const BuyerWorkdayStatsScreen: React.FC<BuyerWorkdayStatsScreenProps> = R
             <button
               type="button"
               onClick={onLogout}
-              className="bg-gray-900 hover:bg-gray-800 text-gray-400 hover:text-white p-2 rounded-lg border border-gray-800 transition"
+              className="bg-gray-900 hover:bg-gray-800 text-gray-400 hover:text-white p-2 rounded-lg border border-gray-800 transition cursor-pointer"
               title="로그아웃"
             >
               <LogOut className="w-4 h-4" />
@@ -694,16 +706,26 @@ export const BuyerWorkdayStatsScreen: React.FC<BuyerWorkdayStatsScreenProps> = R
           )}
         </div>
 
-        {/* Bottom Excel Download Button (Not Fixed) */}
-        <div className="mt-6">
-          <button
-            type="button"
-            onClick={handleDownloadExcel}
-            className="w-full bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white py-3 px-4 rounded-xl font-bold shadow-md text-sm sm:text-base transition flex items-center justify-center gap-2"
-          >
-            <Download className="w-5 h-5" />
-            최종 엑셀 다운로드 ({selectedDateStr})
-          </button>
+        {/* 맨밑: 선택한 날짜만 데이터 저장하는 방식의 엑셀데이터 저장 버튼 */}
+        <div id="bottomExcelExportSectionStats" className="mt-8 pt-6 border-t border-gray-800">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 sm:p-6 text-center shadow-lg">
+            <div className="flex items-center justify-center gap-2 mb-2 text-emerald-400 font-bold text-base sm:text-lg">
+              <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
+              <span>선택한 날짜 엑셀데이터 저장</span>
+            </div>
+            <p className="text-xs sm:text-sm text-gray-400 mb-4 max-w-md mx-auto leading-relaxed">
+              선택된 날짜 <span className="text-blue-400 font-bold">[{selectedDateStr}]</span>의 사입 및 주문 처리 내역 전체(<span className="text-emerald-400 font-bold">{dateOrders.length}건</span>)를 엑셀 파일로 저장합니다.
+            </p>
+            <button
+              id="btnBottomExportExcelStats"
+              type="button"
+              onClick={handleExportSelectedDateExcel}
+              className="w-full max-w-md mx-auto bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white py-3.5 px-6 rounded-xl font-black shadow-lg text-sm sm:text-base transition flex items-center justify-center gap-2.5 cursor-pointer"
+            >
+              <Download className="w-5 h-5" />
+              <span>{selectedDateStr} 엑셀데이터 저장 ({dateOrders.length}건)</span>
+            </button>
+          </div>
         </div>
 
       </div>

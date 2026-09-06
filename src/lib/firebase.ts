@@ -33,7 +33,7 @@ export const FIREBASE_CONFIG = {
 
 export const app = getApps().length ? getApp() : initializeApp(FIREBASE_CONFIG);
 export const auth = getAuth(app);
-export const firestore = getFirestore(app);
+export const firestore = getFirestore(app, 'ai-studio-on-ba5d27f4-0ded-436f-9039-97f519ed3c99');
 export const rtdb = getDatabase(app);
 
 // SHA-256 fallback hasher

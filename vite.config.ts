@@ -11,6 +11,9 @@ export default defineConfig(() => {
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
+      workbox: {
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MiB
+      },
       manifest: {
         id: '/',
         name: '일당달력 앱',
