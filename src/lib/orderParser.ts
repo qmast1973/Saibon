@@ -114,6 +114,7 @@ export function parseSmartOrderText(
   const lines = inputText.split('\n');
   const results: ParsedOrderItem[] = [];
   let currentGroupStore = defaultStoreName.trim();
+  let isFirstLine = true;
 
   for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
     let rawLine = lines[lineIndex].trim();
@@ -124,7 +125,18 @@ export function parseSmartOrderText(
       continue;
     }
 
-    // 소매 상호 그룹 헤더 감지 (예: "[초코송이마켓]", "소매: 초코송이마켓", "★초코송이마켓★", "■ 구름상회")
+    // 맨 첫 문장은 무조건 상호로 처리 (슬래시 분할형 등 명백한 예외 제외)
+    if (isFirstLine) {
+      isFirstLine = false;
+      if (!rawLine.includes('/')) {
+        // [상호] 같은 대괄호나 특수기호를 제거하고 상호로 취급
+        const cleanStoreName = rawLine.replace(/^[\[★■▶◆\*]+|[\]★■▶◆\*]+$/g, '').replace(/^(소매|상호)\s*:\s*/, '').trim();
+        currentGroupStore = cleanStoreName;
+        continue;
+      }
+    }
+
+    // 소매 상호 그룹 헤더 감지 (두번째 줄 이후에 또 명시적으로 [상호] 형태로 입력할 경우를 위해 유지)
     const storeHeaderMatch = rawLine.match(/^(?:\[|★|■|▶|◆|\*|소매\s*:\s*|상호\s*:\s*)([가-힣A-Za-z0-9_\s]{2,20})(?:\]|★|■|▶|◆|\*)?$/);
     if (storeHeaderMatch) {
       const candidate = storeHeaderMatch[1].trim();

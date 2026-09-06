@@ -15,7 +15,7 @@ interface AiOrderImportModalProps {
 const SAMPLE_PRESETS = [
   {
     title: '상호 그룹형 주문',
-    text: `[초코송이마켓]
+    text: `초코송이마켓
 디오트 3층 12호
 청평화 1층 가동 5호 니트 1개
 퀸즈스퀘어 4층 102호 스커트`
@@ -137,14 +137,8 @@ export const AiOrderImportModal: React.FC<AiOrderImportModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-lg font-bold text-white">지능형 빠른 주문 등록</h3>
-                <span className="bg-blue-500/20 text-blue-400 text-xs px-2 py-0.5 rounded-full font-medium border border-blue-500/30">
-                  실시간 자동 분석
-                </span>
+                <h3 className="text-lg font-bold text-white">빠른주문</h3>
               </div>
-              <p className="text-xs text-gray-400 mt-0.5">
-                카톡 주문서, 줄임말, 슬래시 형식을 그대로 붙여넣으면 즉시 표로 분리됩니다.
-              </p>
             </div>
           </div>
           <button
@@ -193,8 +187,8 @@ export const AiOrderImportModal: React.FC<AiOrderImportModalProps> = ({
                 )}
               </div>
               <textarea
-                className="w-full h-56 lg:h-80 bg-gray-950 border border-gray-800 rounded-xl p-3.5 text-xs sm:text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none font-mono leading-relaxed transition-all"
-                placeholder={`카톡이나 문자 주문을 여기에 편하게 붙여넣으세요!\n\n예시 1:\n디 3-12 구름상회 바지 2장\nAPM 7F 45 은하수어패럴 픽업요망\n청 B1-5 오렌지박스\n\n예시 2:\n블루문/디오트/3층/12호/샘플`}
+                className="w-full h-28 sm:h-32 lg:h-[30rem] bg-gray-950 border border-gray-800 rounded-xl p-3.5 text-xs sm:text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none font-mono leading-relaxed transition-all"
+                placeholder={`카톡이나 문자 주문을 여기에 편하게 붙여넣으세요!\n\n예시:\n구름상회\n디 3-12 바지 2장\n청 B1-5 스커트\n블루문/디오트/3층/12호`}
                 value={textInput}
                 onChange={(e) => setTextInput(e.target.value)}
                 disabled={isProcessing}

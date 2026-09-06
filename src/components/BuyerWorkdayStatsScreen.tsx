@@ -332,12 +332,12 @@ export const BuyerWorkdayStatsScreen: React.FC<BuyerWorkdayStatsScreenProps> = R
 
   // Download/Save Excel specifically for the selected date
   const handleExportSelectedDateExcel = () => {
-    if (dateOrders.length === 0) {
-      alert(`선택한 날짜(${selectedDateStr})에 저장할 데이터가 없습니다.`);
+    if (filteredOrders.length === 0) {
+      alert(`현재 선택된 조건(검색/필터)으로 저장할 데이터가 없습니다.`);
       return;
     }
 
-    const finalExport = dateOrders.map(order => {
+    const finalExport = filteredOrders.map(order => {
       const isAnyDone = !!(order.status || '').trim();
       const count = Number(order.itemCount ?? 0);
       return {
@@ -714,7 +714,7 @@ export const BuyerWorkdayStatsScreen: React.FC<BuyerWorkdayStatsScreenProps> = R
               <span>선택한 날짜 엑셀데이터 저장</span>
             </div>
             <p className="text-xs sm:text-sm text-gray-400 mb-4 max-w-md mx-auto leading-relaxed">
-              선택된 날짜 <span className="text-blue-400 font-bold">[{selectedDateStr}]</span>의 사입 및 주문 처리 내역 전체(<span className="text-emerald-400 font-bold">{dateOrders.length}건</span>)를 엑셀 파일로 저장합니다.
+              현재 검색/필터링된 조건의 내역(<span className="text-emerald-400 font-bold">{filteredOrders.length}건</span>)을 엑셀 파일로 저장합니다.
             </p>
             <button
               id="btnBottomExportExcelStats"
@@ -723,7 +723,7 @@ export const BuyerWorkdayStatsScreen: React.FC<BuyerWorkdayStatsScreenProps> = R
               className="w-full max-w-md mx-auto bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white py-3.5 px-6 rounded-xl font-black shadow-lg text-sm sm:text-base transition flex items-center justify-center gap-2.5 cursor-pointer"
             >
               <Download className="w-5 h-5" />
-              <span>{selectedDateStr} 엑셀데이터 저장 ({dateOrders.length}건)</span>
+              <span>현재 목록 엑셀데이터 저장 ({filteredOrders.length}건)</span>
             </button>
           </div>
         </div>

@@ -191,7 +191,7 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
                 className="bg-indigo-700 hover:bg-indigo-600 text-indigo-100 text-[10px] font-bold px-2 py-1.5 rounded flex items-center gap-1 transition border border-indigo-500/50"
               >
                 <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
-                스마트 입력
+                빠른주문
               </button>
             )}
           </div>

@@ -124,11 +124,14 @@ export default function App() {
       }).catch(() => {});
 
       try {
-        const [cachedUser, localUsers, cachedTxs, cachedCollections] = await Promise.all([
-          getSessionUser(),
-          getLocalUsers(),
-          loadTransactionsFromIndexedDB(),
-          Promise.resolve(loadCollections())
+        const [cachedUser, localUsers, cachedTxs, cachedCollections] = await Promise.race([
+          Promise.all([
+            getSessionUser(),
+            getLocalUsers(),
+            loadTransactionsFromIndexedDB(),
+            Promise.resolve(loadCollections())
+          ]),
+          new Promise<any[]>((resolve) => setTimeout(() => resolve([null, [], [], []]), 2000))
         ]);
 
         if (cachedUser) {

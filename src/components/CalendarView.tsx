@@ -234,7 +234,7 @@ export const CalendarView: React.FC<CalendarViewProps> = React.memo(({
                 title="AI로 텍스트에서 주문 자동 추출"
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">스마트 입력</span>
+                <span className="hidden sm:inline">빠른주문</span>
               </button>
               <button
                 type="button"
