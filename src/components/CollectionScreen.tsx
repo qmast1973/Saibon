@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Transaction, CollectionRecord, User, CollectionGroupRule } from '../types';
 import { formatMoney, normalizeMarketName, getBusinessDate } from '../lib/firebase';
-import { HandCoins, Plus, Search, Layers, X, Download, Upload, Trash2, ArrowLeft } from 'lucide-react';
+import { HandCoins, Plus, Search, Layers, X, Download, Upload, Trash2, Edit3, ArrowLeft } from 'lucide-react';
 
 interface CollectionScreenProps {
   transactions: Transaction[];
@@ -10,11 +10,14 @@ interface CollectionScreenProps {
   users: User[];
   collectionGroupRules: CollectionGroupRule[];
   onClose: () => void;
-  onSaveCollection: (collection: CollectionRecord) => void;
+  onSaveCollection: (collection: CollectionRecord | CollectionRecord[]) => void;
   onOpenGroupManager?: () => void;
   onResetCollectionData?: () => void;
   onResetAllData?: () => void;
   onOpenOrderDetail?: (id: string) => void;
+  onEditTransaction?: (tx: Transaction) => void;
+  onUpdateTransaction?: (tx: Transaction) => void;
+  onDeleteTransaction?: (id: string) => void;
   onToggleComplete?: (id: string) => void;
   initialDate?: string;
 }
@@ -31,6 +34,9 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
   onResetCollectionData,
   onResetAllData,
   onOpenOrderDetail,
+  onEditTransaction,
+  onUpdateTransaction,
+  onDeleteTransaction,
   onToggleComplete,
   initialDate
 }) => {
@@ -46,10 +52,16 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
   const [orderListManager, setOrderListManager] = useState("");
   const [orderListDue, setOrderListDue] = useState(0);
 
+  // Edit/Delete state for deposit records
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [editTxInfo, setEditTxInfo] = useState<Transaction | null>(null);
+  const [editAmount, setEditAmount] = useState<string>("");
+
   // Collection entry state
   const [entryStore, setEntryStore] = useState('');
   const [isStoreDropdownOpen, setIsStoreDropdownOpen] = useState(false);
   const [entryAmount, setEntryAmount] = useState<number | string>('');
+  const [entryDeposit, setEntryDeposit] = useState<number | string>('');
   const [entryDue, setEntryDue] = useState<number>(0);
   const [entryDate, setEntryDate] = useState('');
   const [entryManager, setEntryManager] = useState('');
@@ -258,29 +270,56 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
     setEntryManager(currentUserName);
     setEntryDue(due || 0);
     setEntryAmount('');
+    setEntryDeposit('');
     setEntryNote('');
     setShowEntryModal(true);
   };
 
   const handleSaveEntry = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!entryStore.trim() || Number(entryAmount) <= 0) {
-      alert('거래처와 유효한 수금 금액을 입력해주세요.');
+    if (!entryStore.trim()) {
+      alert('거래처를 입력해주세요.');
       return;
     }
 
-    const newRecord: CollectionRecord = {
-      id: `col_${Date.now()}`,
-      store: entryStore.trim(),
-      localManager: entryManager.trim(),
-      date: entryDate || new Date().toISOString().slice(0, 10),
-      amount: Number(entryAmount) || 0,
-      method: '수금',
-      note: entryNote.trim(),
-      createdAt: new Date().toISOString()
-    };
+    const depositAmount = Number(entryDeposit) || 0;
+    const collectionAmount = Number(entryAmount) || 0;
 
-    onSaveCollection(newRecord);
+    if (depositAmount <= 0 && collectionAmount <= 0) {
+      alert('입금액 또는 수금액을 입력해주세요.');
+      return;
+    }
+
+    const recordsToSave: CollectionRecord[] = [];
+
+    if (depositAmount > 0) {
+      recordsToSave.push({
+        id: `col_dep_${Date.now()}`,
+        store: entryStore.trim(),
+        localManager: entryManager.trim(),
+        date: entryDate || new Date().toISOString().slice(0, 10),
+        amount: depositAmount,
+        method: '온라인입금',
+        note: entryNote.trim() ? `온라인입금 - ${entryNote.trim()}` : '온라인입금',
+        createdAt: new Date().toISOString()
+      });
+    }
+
+    if (collectionAmount > 0) {
+      // Small delay in ID generation for uniqueness if both exist
+      recordsToSave.push({
+        id: `col_${Date.now() + 1}`,
+        store: entryStore.trim(),
+        localManager: entryManager.trim(),
+        date: entryDate || new Date().toISOString().slice(0, 10),
+        amount: collectionAmount,
+        method: '수금',
+        note: entryNote.trim(),
+        createdAt: new Date().toISOString()
+      });
+    }
+
+    onSaveCollection(recordsToSave);
     setShowEntryModal(false);
   };
 
@@ -456,7 +495,8 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
                     </tr>
                   ) : (
                     groups.map((g, i) => {
-                      const balance = Math.max(0, g.billed - g.paid);
+                      const fee = g.completedCount * 4;
+                      const balance = Math.max(0, g.billed + fee - g.paid);
                       return (
                         <tr 
                           key={i} 
@@ -473,7 +513,10 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
                               <span className="text-amber-600 font-semibold">미처리 {g.unprocessedCount}</span>
                             </div>
                           </td>
-                          <td className="p-3 text-right text-rose-600 font-mono">{formatMoney(g.billed)}</td>
+                          <td className="p-3 text-right">
+                            <div className="text-rose-600 font-mono">{formatMoney(g.billed)}</div>
+                            {fee > 0 && <div className="text-[10px] text-indigo-500 font-sans">+사입비 {formatMoney(fee)}</div>}
+                          </td>
                           <td className="p-3 text-right text-emerald-600 font-mono">{formatMoney(g.paid)}</td>
                           <td className={`p-3 text-right font-bold font-mono text-sm ${balance > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
                             {formatMoney(balance)}
@@ -489,7 +532,11 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
         </div>
 
         {/* Collection Entry Modal */}
-        {showEntryModal && (
+        {showEntryModal && (() => {
+          const matchedGroup = groups.find(g => g.store === entryStore);
+          const fee = matchedGroup ? matchedGroup.completedCount * 4 : 0;
+          
+          return (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[190] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden p-5 border border-slate-200 my-auto">
               <div className="flex items-center justify-between mb-4 border-b pb-3">
@@ -508,10 +555,22 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
                 <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 mb-4 flex items-center justify-between">
                   <div>
                     <div className="text-indigo-900 font-bold text-sm">{entryStore || '상호명 없음'}</div>
-                    <div className="text-indigo-600 font-medium text-[11px] mt-0.5">미수금(대납금) 잔액</div>
+                    <div className="text-indigo-600 font-medium text-[11px] mt-0.5 flex items-center">
+                      미수금(대납금) 잔액
+                      {matchedGroup && (
+                        <span className="text-emerald-700 font-bold bg-emerald-100/80 px-1.5 py-0.5 rounded ml-2">
+                          완료 {matchedGroup.completedCount}건
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="text-right">
                     <div className="text-rose-600 font-bold text-lg font-mono">{formatMoney(entryDue)}</div>
+                    {fee > 0 && (
+                      <div className="text-indigo-600 font-medium text-[11px] mt-0.5 flex justify-end items-center gap-1">
+                        (사입비 <span className="font-bold font-mono">{formatMoney(fee)}</span> 포함)
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -536,7 +595,8 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
                       <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
                         {filteredStoresForEntry.map((storeName, idx) => {
                           const grp = groupMap.get(storeName);
-                          const balance = grp ? Math.max(0, grp.billed - grp.paid) : 0;
+                          const fee = grp ? grp.completedCount * 4 : 0;
+                          const balance = grp ? Math.max(0, grp.billed + fee - grp.paid) : 0;
                           
                           return (
                             <div
@@ -577,26 +637,73 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
                   </div>
                 </div>
 
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">수금액 (천원) *</label>
-                  <div className="flex items-center w-full border border-slate-300 rounded-xl px-4 py-3 bg-slate-50 focus-within:ring-2 focus-within:ring-emerald-500 focus-within:bg-white transition">
-                    <input
-                      type="number"
-                      required
-                      min="0"
-                      value={entryAmount}
-                      onChange={(e) => setEntryAmount(e.target.value)}
-                      placeholder={entryDue > 0 ? String(entryDue) : "0"}
-                      className="flex-1 bg-transparent text-right text-xl font-bold text-slate-900 font-mono outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none min-w-0"
-                    />
-                    <span className="text-slate-500 text-xl font-bold font-mono shrink-0">
-                      ,000원
-                    </span>
+                <div className="grid grid-cols-2 gap-3 mb-1.5">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1 text-[11px]">온라인 입금액 (천원)</label>
+                    <div className="flex items-center w-full border border-slate-300 rounded-xl px-3 py-2 bg-slate-50 focus-within:ring-2 focus-within:indigo-500 focus-within:bg-white transition">
+                      <input
+                        type="number"
+                        min="0"
+                        value={entryDeposit}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEntryDeposit(val);
+                          if (val && entryDue > 0) {
+                            const depositNum = Number(val);
+                            if (!isNaN(depositNum) && entryDue > depositNum) {
+                              setEntryAmount(String(entryDue - depositNum));
+                            } else if (!isNaN(depositNum) && entryDue <= depositNum) {
+                              setEntryAmount('0');
+                            }
+                          } else if (!val) {
+                            setEntryAmount('');
+                          }
+                        }}
+                        placeholder={entryDue > 0 ? String(entryDue) : "0"}
+                        className="flex-1 bg-transparent text-right text-lg font-bold text-slate-900 font-mono outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none min-w-0"
+                      />
+                      <span className="text-slate-500 text-sm font-bold font-mono shrink-0 ml-0.5">
+                        ,000원
+                      </span>
+                    </div>
                   </div>
-                  <div className="mt-1.5 flex gap-1.5">
-                    <button type="button" onClick={() => setEntryAmount(entryDue)} className="px-2.5 py-1 text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition">
-                      전액입력
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1 text-[11px]">수금액 (천원)</label>
+                    <div className="flex items-center w-full border border-slate-300 rounded-xl px-3 py-2 bg-slate-50 focus-within:ring-2 focus-within:ring-emerald-500 focus-within:bg-white transition">
+                      <input
+                        type="number"
+                        min="0"
+                        value={entryAmount}
+                        onChange={(e) => setEntryAmount(e.target.value)}
+                        placeholder="0"
+                        className="flex-1 bg-transparent text-right text-lg font-bold text-slate-900 font-mono outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none min-w-0"
+                      />
+                      <span className="text-slate-500 text-sm font-bold font-mono shrink-0 ml-0.5">
+                        ,000원
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex gap-1.5">
+                    <button type="button" onClick={() => {
+                      setEntryDeposit(entryDue);
+                      setEntryAmount('0');
+                    }} className="px-2.5 py-1.5 text-[11px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-lg font-medium transition">
+                      입금 전액
                     </button>
+                    <button type="button" onClick={() => {
+                      setEntryAmount(entryDue);
+                      setEntryDeposit('');
+                    }} className="px-2.5 py-1.5 text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition">
+                      수금 전액
+                    </button>
+                  </div>
+                  <div className="text-right text-[11px] font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-lg">
+                    처리 후 미수금:{' '}
+                    <span className={`font-mono text-sm ml-1 ${entryDue - (Number(entryDeposit) || 0) - (Number(entryAmount) || 0) > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                      {formatMoney(Math.max(0, entryDue - (Number(entryDeposit) || 0) - (Number(entryAmount) || 0)))}
+                    </span>
                   </div>
                 </div>
 
@@ -629,7 +736,7 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
               </form>
             </div>
           </div>
-        )}
+        );})()}
 
 
         {/* Order List Modal */}
@@ -756,6 +863,25 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
                               {isCompleted ? '미처리 전환' : '완료 처리'}
                             </button>
                           )}
+                          {isDeposit && (
+                            <div className="flex items-center gap-1">
+                              {onUpdateTransaction && (
+                                <button type="button" onClick={() => {
+                                  setEditTxInfo(t);
+                                  setEditAmount(String(t._income));
+                                }} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="수금 금액 수정">
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {onDeleteTransaction && (
+                                <button type="button" onClick={() => {
+                                  setDeleteConfirmId(t.id);
+                                }} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition" title="수금 내역 삭제">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          )}
 
                           <div className="text-[11px] text-slate-600 font-medium bg-slate-100 px-2 py-0.5 rounded text-right shrink-0" title="사입담당">
                             {t.actualManager || t.manager || t.originalManager || '-'}
@@ -773,6 +899,80 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
             </div>
           </div>
         );})()}
+        {/* Custom Edit Modal */}
+        {editTxInfo && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 relative">
+              <h3 className="font-bold text-slate-800 text-lg mb-4">입금/수금액 수정</h3>
+              <div className="mb-4">
+                <label className="block text-sm font-semibold text-slate-700 mb-1">금액</label>
+                <input
+                  type="number"
+                  value={editAmount}
+                  onChange={(e) => setEditAmount(e.target.value)}
+                  className="w-full border border-slate-300 rounded-xl p-3 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none text-right font-mono text-lg font-bold"
+                  placeholder="금액 입력"
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setEditTxInfo(null); setEditAmount(""); }}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-300 font-bold text-slate-600 hover:bg-slate-50 transition"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newAmount = Number(editAmount);
+                    if (!isNaN(newAmount) && onUpdateTransaction) {
+                      onUpdateTransaction({ ...editTxInfo, income: newAmount });
+                    }
+                    setEditTxInfo(null);
+                    setEditAmount("");
+                  }}
+                  className="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-500 transition"
+                >
+                  수정하기
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Custom Delete Confirm Modal */}
+        {deleteConfirmId && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
+              <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <h3 className="font-bold text-slate-800 text-lg mb-2">수금 내역 삭제</h3>
+              <p className="text-sm text-slate-500 mb-6">정말로 이 내역을 삭제하시겠습니까?<br/>삭제 후 복구할 수 없습니다.</p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirmId(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-300 font-bold text-slate-600 hover:bg-slate-50 transition"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onDeleteTransaction) onDeleteTransaction(deleteConfirmId);
+                    setDeleteConfirmId(null);
+                  }}
+                  className="flex-1 py-2.5 rounded-xl bg-rose-600 text-white font-bold hover:bg-rose-500 transition"
+                >
+                  삭제하기
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
     </div>

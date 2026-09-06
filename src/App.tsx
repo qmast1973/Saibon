@@ -337,6 +337,19 @@ export default function App() {
     }
   };
 
+  const handleUpdateTransaction = async (updatedTx: Transaction) => {
+    const updated = transactions.map(t => t.id === updatedTx.id ? updatedTx : t);
+    setTransactions(updated);
+    await saveTransactionsToIndexedDB(updated);
+    if (currentUser?.isFirebaseLinked) {
+      try {
+        await saveOrderToFirebase(updatedTx);
+      } catch (e) {
+        console.warn('Firebase sync error on update:', e);
+      }
+    }
+  };
+
   const handleToggleComplete = async (id: string) => {
     let targetTx: Transaction | undefined;
     const updated = transactions.map(t => {
@@ -773,15 +786,23 @@ export default function App() {
               setShowOrderModal(true);
             }
           }}
+          onEditTransaction={handleEditTransaction}
+          onDeleteTransaction={handleDeleteTransaction}
+          onUpdateTransaction={handleUpdateTransaction}
           onToggleComplete={handleToggleComplete}
-          onSaveCollection={async (col) => {
-            const updated = [col, ...collections];
-            setCollections(updated);
-            saveCollections(updated);
-            
+          onSaveCollection={async (colInput) => {
+            const colsToSave = Array.isArray(colInput) ? colInput : [colInput];
+            if (colsToSave.length === 0) return;
+
+            setCollections(prev => {
+              const updated = [...colsToSave, ...prev];
+              saveCollections(updated);
+              return updated;
+            });
+
             // 또한 입금 거래 내역(Transaction)으로도 반영하여 장부와 수금 현황이 일치되도록 동기화
-            const depositTx: Transaction = {
-              id: col.id || `col_tx_${Date.now()}`,
+            const newTxs: Transaction[] = colsToSave.map((col, idx) => ({
+              id: col.id || `col_tx_${Date.now()}_${idx}`,
               date: col.date,
               businessDate: col.date,
               market: '입금',
@@ -796,11 +817,16 @@ export default function App() {
               room: '',
               status: '완료',
               createdAt: new Date().toISOString()
-            };
-            const updatedTx = [depositTx, ...transactions];
-            setTransactions(updatedTx);
-            await saveTransactionsToIndexedDB(updatedTx);
-            await saveOrdersBulkToFirebase([depositTx]);
+            }));
+
+            setTransactions(prev => {
+              const updatedTx = [...newTxs, ...prev];
+              saveTransactionsToIndexedDB(updatedTx);
+              if (currentUser?.isFirebaseLinked) {
+                saveOrdersBulkToFirebase(newTxs).catch(console.error);
+              }
+              return updatedTx;
+            });
           }}
         />
       )}
