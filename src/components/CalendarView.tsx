@@ -17,6 +17,7 @@ interface CalendarViewProps {
   onCompleteTransaction: (id: string) => void;
   onImportOrders?: (orders: Transaction[]) => void;
   onOpenAiModal?: () => void;
+  onOpenWorkdayStats?: () => void;
 }
 
 export const CalendarView: React.FC<CalendarViewProps> = React.memo(({
@@ -32,7 +33,8 @@ export const CalendarView: React.FC<CalendarViewProps> = React.memo(({
   onDeleteTransaction,
   onCompleteTransaction,
   onImportOrders,
-  onOpenAiModal
+  onOpenAiModal,
+  onOpenWorkdayStats
 }) => {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
@@ -129,6 +131,15 @@ export const CalendarView: React.FC<CalendarViewProps> = React.memo(({
             >
               오늘
             </button>
+            {(currentUser?.role === 'buyer' || currentUser?.role === 'admin') && (
+              <button
+                type="button"
+                onClick={onOpenWorkdayStats}
+                className="h-8 px-3 rounded-xl bg-pink-50 hover:bg-pink-100 border border-pink-200 text-pink-700 text-xs font-bold transition flex items-center gap-1"
+              >
+                <span>📊</span> 갯수 집계
+              </button>
+            )}
           </div>
         </div>
 

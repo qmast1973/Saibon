@@ -26,7 +26,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 
-interface BuyerWorkdayScreenProps {
+interface BuyerWorkdayStatsScreenProps {
   currentUser: User;
   transactions: Transaction[];
   selectedDateStr: string;
@@ -38,7 +38,7 @@ interface BuyerWorkdayScreenProps {
   onUpdateTransaction: (tx: Transaction) => void;
 }
 
-export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(({
+export const BuyerWorkdayStatsScreen: React.FC<BuyerWorkdayStatsScreenProps> = React.memo(({
   currentUser,
   transactions,
   selectedDateStr,
@@ -55,8 +55,7 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(
   const [selectedFloor, setSelectedFloor] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [activeActionId, setActiveActionId] = useState<string | null>(null);
-  const [activeActionType, setActiveActionType] = useState<'주문' | '미송' | '반품' | null>(null);
+    const [activeActionType, setActiveActionType] = useState<'주문' | '미송' | '반품' | null>(null);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
   // Filter orders for the selected date
@@ -283,9 +282,7 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(
       actualManager: currentUser.name || tx.actualManager || tx.manager,
       assignedManager: currentUser.name || tx.assignedManager || tx.manager
     };
-    setActiveActionId(null);
-    setActiveActionType(null);
-
+        
     // Update local state immediately
     onUpdateTransaction(updatedTx);
 
@@ -373,7 +370,7 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl sm:text-2xl font-black text-blue-400 tracking-tight flex items-center gap-1.5">
-                사입ON <span className="text-xs sm:text-sm font-normal px-2 py-0.5 rounded-full bg-blue-900/60 text-blue-300 border border-blue-700">실시간 동선</span>
+                사입ON <span className="text-xs sm:text-sm font-normal px-2 py-0.5 rounded-full bg-pink-900/60 text-pink-300 border border-pink-700">갯수 집계</span>
               </h1>
               <span className="text-xs text-gray-400">({currentUser.name} 사입삼촌)</span>
             </div>
@@ -383,17 +380,7 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(
           </div>
 
           <div className="flex items-center gap-2">
-            {onOpenAddOrder && (
-              <button
-                type="button"
-                onClick={onOpenAddOrder}
-                className="bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white py-2 px-3 rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-sm"
-                title="새로운 주문 입력"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                신규 주문 입력
-              </button>
-            )}
+            
             <button
               type="button"
               onClick={onStartEnteringOrder}
@@ -512,32 +499,91 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-1.5 text-center text-xs">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-12 gap-1.5 text-center text-xs">
             <button 
               type="button"
-              onClick={() => setStatusFilter('all')}
-              className={`rounded-lg py-1 px-0.5 border transition-all duration-200 cursor-pointer hover:brightness-125 active:scale-95 ${statusFilter === 'all' ? 'bg-gray-700 border-gray-500 ring-1 ring-gray-400 ring-offset-1 ring-offset-gray-900' : 'bg-gray-800/80 border-gray-700/60'}`}>
+              onClick={() => setStatusFilter("all")}
+              className={`rounded-lg py-1 px-0.5 border transition-all duration-200 cursor-pointer hover:brightness-125 active:scale-95 ${statusFilter === "all" ? "bg-gray-700 border-gray-500 ring-1 ring-gray-400 ring-offset-1 ring-offset-gray-900" : "bg-gray-800/80 border-gray-700/60"}`}>
               <div className="text-[10px] tracking-tight text-gray-400 font-semibold mb-0.5">총 주문건수</div>
               <div className="text-sm sm:text-base font-black text-white">{workdayStats.totalOrderCount}<span className="text-[10px] font-normal ml-0.5 text-gray-400">건</span></div>
             </button>
-
             <button 
               type="button"
-              onClick={() => setStatusFilter('completed')}
-              className={`rounded-lg py-1 px-0.5 border transition-all duration-200 cursor-pointer hover:brightness-125 active:scale-95 ${statusFilter === 'completed' ? 'bg-emerald-900 border-emerald-500 ring-1 ring-emerald-400 ring-offset-1 ring-offset-gray-900' : 'bg-emerald-950/40 border-emerald-800/60'}`}>
+              onClick={() => setStatusFilter("completed")}
+              className={`rounded-lg py-1 px-0.5 border transition-all duration-200 cursor-pointer hover:brightness-125 active:scale-95 ${statusFilter === "completed" ? "bg-emerald-900 border-emerald-500 ring-1 ring-emerald-400 ring-offset-1 ring-offset-gray-900" : "bg-emerald-950/40 border-emerald-800/60"}`}>
               <div className="text-[10px] tracking-tight text-emerald-300 font-semibold mb-0.5">완료건수</div>
               <div className="text-sm sm:text-base font-black text-emerald-400">{workdayStats.completedCount}<span className="text-[10px] font-normal ml-0.5 text-emerald-300">건</span></div>
             </button>
-
             <button 
               type="button"
-              onClick={() => setStatusFilter('uncompleted')}
-              className={`rounded-lg py-1 px-0.5 border transition-all duration-200 cursor-pointer hover:brightness-125 active:scale-95 ${statusFilter === 'uncompleted' ? 'bg-amber-900 border-amber-500 ring-1 ring-amber-400 ring-offset-1 ring-offset-gray-900' : 'bg-amber-950/40 border-amber-800/60'}`}>
+              onClick={() => setStatusFilter("uncompleted")}
+              className={`rounded-lg py-1 px-0.5 border transition-all duration-200 cursor-pointer hover:brightness-125 active:scale-95 ${statusFilter === "uncompleted" ? "bg-amber-900 border-amber-500 ring-1 ring-amber-400 ring-offset-1 ring-offset-gray-900" : "bg-amber-950/40 border-amber-800/60"}`}>
               <div className="text-[10px] tracking-tight text-amber-300 font-semibold mb-0.5">처리 대기</div>
               <div className="text-sm sm:text-base font-black text-amber-400">{workdayStats.uncompletedCount}<span className="text-[10px] font-normal ml-0.5 text-amber-300">건</span></div>
             </button>
-
-            
+            <button 
+              type="button"
+              onClick={() => setStatusFilter("itemCountNonZero")}
+              className={`rounded-lg py-1 px-0.5 border transition-all duration-200 cursor-pointer hover:brightness-125 active:scale-95 ${statusFilter === "itemCountNonZero" ? "bg-cyan-900 border-cyan-500 ring-1 ring-cyan-400 ring-offset-1 ring-offset-gray-900" : "bg-cyan-950/40 border-cyan-800/60"}`}>
+              <div className="text-[10px] tracking-tight text-cyan-300 font-semibold mb-0.5">물건 갯수합계</div>
+              <div className="text-sm sm:text-base font-black text-cyan-400">{workdayStats.totalItemCount}<span className="text-[10px] font-normal ml-0.5 text-cyan-300">개</span></div>
+            </button>
+            <button 
+              type="button"
+              onClick={() => setStatusFilter("itemCountGte2")}
+              className={`rounded-lg py-1 px-0.5 border transition-all duration-200 cursor-pointer hover:brightness-125 active:scale-95 ${statusFilter === "itemCountGte2" ? "bg-indigo-900 border-indigo-500 ring-1 ring-indigo-400 ring-offset-1 ring-offset-gray-900" : "bg-indigo-950/40 border-indigo-800/60"}`}>
+              <div className="text-[10px] tracking-tight text-indigo-300 font-semibold mb-0.5">물건 2개이상</div>
+              <div className="text-sm sm:text-base font-black text-indigo-400">{workdayStats.itemCountGte2Count}<span className="text-[10px] font-normal ml-0.5 text-indigo-300">건</span></div>
+            </button>
+            <button 
+              type="button"
+              onClick={() => setStatusFilter("주문/물건 없음")}
+              className={`rounded-lg py-1 px-0.5 border transition-all duration-200 cursor-pointer hover:brightness-125 active:scale-95 ${statusFilter === "주문/물건 없음" ? "bg-slate-700 border-slate-400 ring-1 ring-slate-300 ring-offset-1 ring-offset-gray-900" : "bg-slate-800/80 border-slate-700/60"}`}>
+              <div className="text-[10px] tracking-tight text-slate-300 font-semibold mb-0.5">주문/물건 없음</div>
+              <div className="text-sm sm:text-base font-black text-slate-200">{workdayStats.noOrderOrItemCount}<span className="text-[10px] font-normal ml-0.5 text-slate-400">건</span></div>
+            </button>
+            <button 
+              type="button"
+              onClick={() => setStatusFilter("올미송(결제만)")}
+              className={`rounded-lg py-1 px-0.5 border transition-all duration-200 cursor-pointer hover:brightness-125 active:scale-95 ${statusFilter === "올미송(결제만)" ? "bg-yellow-900 border-yellow-500 ring-1 ring-yellow-400 ring-offset-1 ring-offset-gray-900" : "bg-yellow-950/40 border-yellow-800/60"}`}>
+              <div className="text-[10px] tracking-tight text-yellow-300 font-semibold mb-0.5">올미송(결제)</div>
+              <div className="text-sm sm:text-base font-black text-yellow-400">{workdayStats.allMisongCount}<span className="text-[10px] font-normal ml-0.5 text-yellow-300">건</span></div>
+            </button>
+            <button 
+              type="button"
+              onClick={() => setStatusFilter("미송(찾기)")}
+              className={`rounded-lg py-1 px-0.5 border transition-all duration-200 cursor-pointer hover:brightness-125 active:scale-95 ${statusFilter === "미송(찾기)" ? "bg-orange-900 border-orange-500 ring-1 ring-orange-400 ring-offset-1 ring-offset-gray-900" : "bg-orange-950/40 border-orange-800/60"}`}>
+              <div className="text-[10px] tracking-tight text-orange-300 font-semibold mb-0.5">미송(찾기)</div>
+              <div className="text-sm sm:text-base font-black text-orange-400">{workdayStats.misongFindCount}<span className="text-[10px] font-normal ml-0.5 text-orange-300">건</span></div>
+            </button>
+            <button 
+              type="button"
+              onClick={() => setStatusFilter("반품만")}
+              className={`rounded-lg py-1 px-0.5 border transition-all duration-200 cursor-pointer hover:brightness-125 active:scale-95 ${statusFilter === "반품만" ? "bg-rose-900 border-rose-500 ring-1 ring-rose-400 ring-offset-1 ring-offset-gray-900" : "bg-rose-950/40 border-rose-800/60"}`}>
+              <div className="text-[10px] tracking-tight text-rose-300 font-semibold mb-0.5">반품만</div>
+              <div className="text-sm sm:text-base font-black text-rose-400">{workdayStats.returnOnlyCount}<span className="text-[10px] font-normal ml-0.5 text-rose-300">건</span></div>
+            </button>
+            <button 
+              type="button"
+              onClick={() => setStatusFilter("교환/반송")}
+              className={`rounded-lg py-1 px-0.5 border transition-all duration-200 cursor-pointer hover:brightness-125 active:scale-95 ${statusFilter === "교환/반송" ? "bg-pink-900 border-pink-500 ring-1 ring-pink-400 ring-offset-1 ring-offset-gray-900" : "bg-pink-950/40 border-pink-800/60"}`}>
+              <div className="text-[10px] tracking-tight text-pink-300 font-semibold mb-0.5">교환/반송</div>
+              <div className="text-sm sm:text-base font-black text-pink-400">{workdayStats.returnExchangeCount}<span className="text-[10px] font-normal ml-0.5 text-pink-300">건</span></div>
+            </button>
+            <button 
+              type="button"
+              onClick={() => setStatusFilter("교환/매입")}
+              className={`rounded-lg py-1 px-0.5 border transition-all duration-200 cursor-pointer hover:brightness-125 active:scale-95 ${statusFilter === "교환/매입" ? "bg-fuchsia-900 border-fuchsia-500 ring-1 ring-fuchsia-400 ring-offset-1 ring-offset-gray-900" : "bg-fuchsia-950/40 border-fuchsia-800/60"}`}>
+              <div className="text-[10px] tracking-tight text-fuchsia-300 font-semibold mb-0.5">교환/매입</div>
+              <div className="text-sm sm:text-base font-black text-fuchsia-400">{workdayStats.exchangePurchaseCount}<span className="text-[10px] font-normal ml-0.5 text-fuchsia-300">건</span></div>
+            </button>
+            <button 
+              type="button"
+              onClick={() => setStatusFilter("매입처리")}
+              className={`rounded-lg py-1 px-0.5 border transition-all duration-200 cursor-pointer hover:brightness-125 active:scale-95 ${statusFilter === "매입처리" ? "bg-purple-900 border-purple-500 ring-1 ring-purple-400 ring-offset-1 ring-offset-gray-900" : "bg-purple-950/40 border-purple-800/60"}`}>
+              <div className="text-[10px] tracking-tight text-purple-300 font-semibold mb-0.5">매입처리</div>
+              <div className="text-sm sm:text-base font-black text-purple-400">{workdayStats.purchaseCount}<span className="text-[10px] font-normal ml-0.5 text-purple-300">건</span></div>
+            </button>
           </div>
         </div>
 
@@ -617,48 +663,19 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(
                       <div className="flex flex-col items-end">
                         <div className="mb-1">
                           <div className="flex items-center gap-1">
-                            <input 
-                              type="checkbox" 
-                              checked={!!order.isReturn}
-                              onChange={(e) => handleUpdateField(order, 'isReturn', e.target.checked)}
-                              className="w-3 h-3 text-red-500 rounded bg-gray-800 border-gray-700 focus:ring-red-500 focus:ring-offset-gray-900"
-                            />
-                            <label className="text-[10px] text-red-400 font-semibold cursor-pointer" onClick={(e) => { e.preventDefault(); handleUpdateField(order, 'isReturn', !order.isReturn); }}>반품있음</label>
+                            <input type="checkbox" checked={!!order.isReturn} readOnly className="w-3 h-3 text-red-500 rounded bg-gray-800 border-gray-700" />
+                            <label className="text-[10px] text-red-400 font-semibold">반품있음</label>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <label className="text-sm text-gray-300 font-bold shrink-0">물건갯수</label>
-                          <input
-                            type="number"
-                            value={order.itemCount ?? 0}
-                            onChange={(e) => {
-                               onUpdateTransaction({...order, itemCount: Number(e.target.value)});
-                            }}
-                            onBlur={(e) => handleUpdateField(order, 'itemCount', e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                (e.target).blur();
-                              }
-                            }}
-                            className="bg-gray-800 text-white border border-gray-700 w-14 sm:w-16 p-1.5 rounded-lg text-center font-black text-sm sm:text-base outline-none focus:ring-2 focus:ring-blue-500"
-                          />
+                          <div className="bg-gray-800 text-white border border-gray-700 w-14 sm:w-16 p-1.5 rounded-lg text-center font-black text-sm sm:text-base cursor-default select-none">{order.itemCount ?? 0}</div>
                         </div>
                       </div>
                       <div className="flex flex-col items-end">
                         <label className="text-[10px] text-gray-400 mb-0.5 font-semibold">대납금</label>
                         <div className="relative flex items-center">
-                          <input
-                            type="text"
-                            defaultValue={order.expense ? order.expense.toLocaleString() : ''}
-                            onBlur={(e) => handleUpdateField(order, 'expense', e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                (e.target as HTMLInputElement).blur();
-                              }
-                            }}
-                            placeholder="입력"
-                            className="bg-gray-800 text-amber-400 border border-gray-700 w-28 sm:w-32 p-1.5 pr-10 rounded-lg text-right font-black text-sm sm:text-base outline-none focus:ring-2 focus:ring-amber-500"
-                          />
+                          <div className="bg-gray-800 text-amber-400 border border-gray-700 w-28 sm:w-32 p-1.5 pr-10 rounded-lg text-right font-black text-sm sm:text-base cursor-default select-none overflow-hidden">{order.expense ? order.expense.toLocaleString() : ''}</div>
                           <span className="absolute right-2 text-gray-400 text-xs font-medium pointer-events-none">,000원</span>
                         </div>
                       </div>
@@ -667,155 +684,11 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(
 
                   {/* Memo Input */}
                   <div className="mb-3">
-                    <input
-                      type="text"
-                      defaultValue={order.remark || ''}
-                      onBlur={(e) => handleUpdateField(order, 'remark', e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          (e.target as HTMLInputElement).blur();
-                        }
-                      }}
-                      placeholder="특이사항 메모 (비고 입력 후 엔터 또는 다른 곳 클릭)"
-                      className="w-full bg-gray-800 text-amber-300 border border-gray-700 p-2.5 rounded-lg text-xs sm:text-sm outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-500"
-                    />
+                    <div className="w-full bg-gray-800 text-amber-300 border border-gray-700 p-2.5 rounded-lg text-xs sm:text-sm cursor-default select-none min-h-[38px]">{order.remark || '특이사항 없음'}</div>
                   </div>
 
                   {/* Status Buttons (완료 / 미송 / 반품) */}
-                  <div className="pt-2 border-t border-gray-800 flex flex-col gap-2">
-                    {activeActionId === order.id && activeActionType === '주문' ? (
-                      <div className="flex flex-wrap gap-2">
-                        <button type="button" onClick={() => handleUpdateStatus(order, '주문찾기')} className="flex-1 min-w-[60px] py-2 rounded-lg text-[11px] font-bold border transition bg-green-600 border-green-500 text-white shadow-md hover:bg-green-500">주문찾기</button>
-                        <button type="button" onClick={() => handleUpdateStatus(order, '샘플')} className="flex-1 min-w-[50px] py-2 rounded-lg text-[11px] font-bold border transition bg-teal-600 border-teal-500 text-white shadow-md hover:bg-teal-500">샘플</button>
-                        <button type="button" onClick={() => handleUpdateStatus(order, '주문없음')} className="flex-1 min-w-[60px] py-2 rounded-lg text-[11px] font-bold border transition bg-slate-600 border-slate-500 text-white shadow-md hover:bg-slate-500">주문없음</button>
-                        <button type="button" onClick={() => handleUpdateStatus(order, '물건없음')} className="flex-1 min-w-[60px] py-2 rounded-lg text-[11px] font-bold border transition bg-slate-600 border-slate-500 text-white shadow-md hover:bg-slate-500">물건없음</button>
-                        <button type="button" onClick={() => { setActiveActionId(null); setActiveActionType(null); }} className="px-3 py-2 rounded-lg text-[11px] font-bold border transition bg-gray-700 border-gray-600 text-white hover:bg-gray-600">취소</button>
-                      </div>
-                    ) : activeActionId === order.id && activeActionType === '미송' ? (
-                      <div className="flex space-x-2">
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateStatus(order, '올미송(결제만)')}
-                          className="flex-1 py-2 rounded-lg text-xs font-bold border transition bg-orange-600 border-orange-500 text-white shadow-md hover:bg-orange-500"
-                        >
-                          올미송(결제만)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateStatus(order, '미송(찾기)')}
-                          className="flex-1 py-2 rounded-lg text-xs font-bold border transition bg-yellow-600 border-yellow-500 text-white shadow-md hover:bg-yellow-500"
-                        >
-                          미송(찾기)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setActiveActionId(null); setActiveActionType(null); }}
-                          className="px-3 py-2 rounded-lg text-xs font-bold border transition bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
-                        >
-                          취소
-                        </button>
-                      </div>
-                    ) : activeActionId === order.id && activeActionType === '반품' ? (
-                      <div className="flex space-x-2 flex-wrap sm:flex-nowrap gap-y-2">
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateStatus(order, '교환')}
-                          className="flex-1 min-w-[60px] py-2 rounded-lg text-xs font-bold border transition bg-blue-600 border-blue-500 text-white shadow-md hover:bg-blue-500"
-                        >
-                          교환
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateStatus(order, '반품만')}
-                          className="flex-1 min-w-[60px] py-2 rounded-lg text-xs font-bold border transition bg-rose-600 border-rose-500 text-white shadow-md hover:bg-rose-500"
-                        >
-                          반품만
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateStatus(order, '반송')}
-                          className="flex-1 min-w-[60px] py-2 rounded-lg text-xs font-bold border transition bg-slate-600 border-slate-500 text-white shadow-md hover:bg-slate-500"
-                        >
-                          반송
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateStatus(order, '교환/매입')}
-                          className="flex-1 min-w-[60px] py-2 rounded-lg text-xs font-bold border transition bg-fuchsia-600 border-fuchsia-500 text-white shadow-md hover:bg-fuchsia-500"
-                        >교환/매입</button>
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateStatus(order, '매입처리')}
-                          disabled={!order.isReturn}
-                          className={`flex-1 min-w-[60px] py-2 rounded-lg text-xs font-bold border transition shadow-md ${
-                            order.isReturn
-                              ? 'bg-green-600 border-green-500 text-white hover:bg-green-500'
-                              : 'bg-gray-700 border-gray-600 text-gray-400 opacity-50 cursor-not-allowed'
-                          }`}
-                        >
-                          매입처리
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setActiveActionId(null); setActiveActionType(null); }}
-                          className="px-3 py-2 rounded-lg text-xs font-bold border transition bg-gray-700 border-gray-600 text-white hover:bg-gray-600 shrink-0"
-                        >
-                          취소
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex space-x-2">
-                        <button
-    type="button"
-    onClick={() => {
-      if (isOrderComplete) handleUpdateStatus(order, '');
-      else { setActiveActionId(order.id); setActiveActionType('주문'); }
-    }}
-    className={`flex-1 py-2 rounded-lg text-xs font-bold border transition ${
-      isOrderComplete
-        ? 'bg-green-600 border-green-500 ring-2 ring-green-400 text-white shadow-md'
-        : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-white hover:bg-gray-700'
-    }`}
-  >
-    {isOrderComplete ? order.status : '주문처리'}
-  </button>
-
-                        <button
-    type="button"
-    onClick={() => {
-      if (isPending) handleUpdateStatus(order, '');
-      else { setActiveActionId(order.id); setActiveActionType('미송'); }
-    }}
-    className={`flex-1 py-2 rounded-lg text-xs font-bold border transition ${
-      isPending
-        ? 'bg-yellow-600 border-yellow-500 ring-2 ring-yellow-400 text-white shadow-md'
-        : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-white hover:bg-gray-700'
-    }`}
-  >
-    {isPending ? order.status : '미송'}
-  </button>
-
-                        <button
-    type="button"
-    disabled={!order.isReturn && !isReturn}
-    onClick={() => {
-      if (isReturn) handleUpdateStatus(order, '');
-      else { setActiveActionId(order.id); setActiveActionType('반품'); }
-    }}
-    className={`flex-1 py-2 rounded-lg text-xs font-bold border transition ${
-      isReturn
-        ? 'bg-red-600 border-red-500 ring-2 ring-red-400 text-white shadow-md'
-        : !order.isReturn 
-          ? 'bg-gray-900 border-gray-800 text-gray-600 opacity-50 cursor-not-allowed'
-          : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-white hover:bg-gray-700'
-    }`}
-  >
-    {isReturn ? order.status : '반품'}
-  </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                                  </div>
               );
             })
           )}

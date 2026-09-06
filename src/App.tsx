@@ -46,6 +46,7 @@ import { CollectionScreen } from './components/CollectionScreen';
 import { GroupRulesManagerModal } from './components/GroupRulesManagerModal';
 
 import { BuyerWorkdayScreen } from './components/BuyerWorkdayScreen';
+import { BuyerWorkdayStatsScreen } from './components/BuyerWorkdayStatsScreen';
 import { BoardScreen } from './components/BoardScreen';
 import { ExcelImportWizard } from './components/ExcelImportWizard';
 import { LocalMerchantInfoModal } from './components/LocalMerchantInfoModal';
@@ -77,6 +78,7 @@ export default function App() {
   const [showAiModal, setShowAiModal] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
     const [showBuyerWorkdayScreen, setShowBuyerWorkdayScreen] = useState(false);
+  const [showBuyerWorkdayStatsScreen, setShowBuyerWorkdayStatsScreen] = useState(false);
   const [showBoardScreen, setShowBoardScreen] = useState(false);
 
   const [collections, setCollections] = useState<CollectionRecord[]>([]);
@@ -688,6 +690,7 @@ export default function App() {
           onEditTransaction={handleEditTransaction}
           onDeleteTransaction={handleDeleteTransaction}
           onCompleteTransaction={handleCompleteTransaction}
+          onOpenWorkdayStats={() => setShowBuyerWorkdayStatsScreen(true)}
           onImportOrders={(newOrders) => {
             setCleanTransactions([...transactions, ...newOrders]);
           }}
@@ -879,6 +882,24 @@ export default function App() {
       
       {showBoardScreen && currentUser && (
         <BoardScreen currentUser={currentUser} onClose={() => setShowBoardScreen(false)} />
+      )}
+      {showBuyerWorkdayStatsScreen && (currentUser?.role === 'buyer' || currentUser?.role === 'admin') && (
+        <BuyerWorkdayStatsScreen
+          currentUser={currentUser}
+          transactions={roleFilteredTransactions}
+          selectedDateStr={selectedDateStr}
+          onSelectDateStr={setSelectedDateStr}
+          onLogout={handleLogout}
+          onStartEnteringOrder={() => setShowBuyerWorkdayStatsScreen(false)}
+          onOpenAddOrder={() => setShowOrderModal(true)}
+          onOpenOrder={handleEditTransaction}
+          onUpdateTransaction={(updatedTx) => {
+            React.startTransition(() => {
+              setTransactions(prev => prev.map(t => t.id === updatedTx.id ? updatedTx : t));
+            });
+            updateTransactionInIndexedDB(updatedTx).catch(console.warn);
+          }}
+        />
       )}
       {showBuyerWorkdayScreen && (currentUser?.role === 'buyer' || currentUser?.role === 'admin') && (
 
