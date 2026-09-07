@@ -16,9 +16,9 @@ export default defineConfig(() => {
       },
       manifest: {
         id: '/',
-        name: '일당달력 앱',
-        short_name: '일당달력',
-        description: '일당달력 PWA 앱',
+        name: '사입ON 앱',
+        short_name: '사입ON',
+        description: '사입ON PWA 앱',
         theme_color: '#4f46e5',
         background_color: '#ffffff',
         display: 'standalone',
