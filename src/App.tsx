@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useDeferredValue } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useDeferredValue, Suspense, lazy } from 'react';
 import * as XLSX from 'xlsx';
 import { User, Transaction, CollectionRecord, CollectionGroupRule } from './types';
 import {
@@ -35,23 +35,23 @@ import {
 
 import { Navbar } from './components/Navbar';
 import { AuthScreen } from './components/AuthScreen';
-import { AdminAddModal } from './components/AdminAddModal';
-import { AdminUserManagementModal } from './components/AdminUserManagementModal';
-import { ProfileModal } from './components/ProfileModal';
-import { OrderEntryModal } from './components/OrderEntryModal';
 import { CalendarView } from './components/CalendarView';
-import { AiOrderImportModal } from './components/AiOrderImportModal';
 
-import { CollectionScreen } from './components/CollectionScreen';
-import { GroupRulesManagerModal } from './components/GroupRulesManagerModal';
+const AdminAddModal = lazy(() => import('./components/AdminAddModal').then(module => ({ default: module.AdminAddModal })));
+const AdminUserManagementModal = lazy(() => import('./components/AdminUserManagementModal').then(module => ({ default: module.AdminUserManagementModal })));
+const ProfileModal = lazy(() => import('./components/ProfileModal').then(module => ({ default: module.ProfileModal })));
+const OrderEntryModal = lazy(() => import('./components/OrderEntryModal').then(module => ({ default: module.OrderEntryModal })));
+const AiOrderImportModal = lazy(() => import('./components/AiOrderImportModal').then(module => ({ default: module.AiOrderImportModal })));
+const CollectionScreen = lazy(() => import('./components/CollectionScreen').then(module => ({ default: module.CollectionScreen })));
+const GroupRulesManagerModal = lazy(() => import('./components/GroupRulesManagerModal').then(module => ({ default: module.GroupRulesManagerModal })));
+const BuyerWorkdayScreen = lazy(() => import('./components/BuyerWorkdayScreen').then(module => ({ default: module.BuyerWorkdayScreen })));
+const BuyerWorkdayStatsScreen = lazy(() => import('./components/BuyerWorkdayStatsScreen').then(module => ({ default: module.BuyerWorkdayStatsScreen })));
+const BoardScreen = lazy(() => import('./components/BoardScreen').then(module => ({ default: module.BoardScreen })));
+const ExcelImportWizard = lazy(() => import('./components/ExcelImportWizard').then(module => ({ default: module.ExcelImportWizard })));
+const LocalMerchantInfoModal = lazy(() => import('./components/LocalMerchantInfoModal').then(module => ({ default: module.LocalMerchantInfoModal })));
+const DataManagementModal = lazy(() => import('./components/DataManagementModal').then(module => ({ default: module.DataManagementModal })));
+const BuildingManagerModal = lazy(() => import('./components/BuildingManagerModal').then(module => ({ default: module.BuildingManagerModal })));
 
-import { BuyerWorkdayScreen } from './components/BuyerWorkdayScreen';
-import { BuyerWorkdayStatsScreen } from './components/BuyerWorkdayStatsScreen';
-import { BoardScreen } from './components/BoardScreen';
-import { ExcelImportWizard } from './components/ExcelImportWizard';
-import { LocalMerchantInfoModal } from './components/LocalMerchantInfoModal';
-import { DataManagementModal } from './components/DataManagementModal';
-import { BuildingManagerModal } from './components/BuildingManagerModal';
 import { Search } from 'lucide-react';
 
 export default function App() {
@@ -303,44 +303,47 @@ export default function App() {
   }, [roleFilteredTransactions, deferredSearchQuery]);
 
   // Month navigation
-  const handleChangeMonth = (delta: number) => {
-    const next = new Date(currentDate.getFullYear(), currentDate.getMonth() + delta, 1);
-    setCurrentDate(next);
-  };
+  const handleChangeMonth = useCallback((delta: number) => {
+    setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
+  }, []);
 
-  const handleGoToToday = () => {
+  const handleGoToToday = useCallback(() => {
     const todayStr = getBusinessDate();
     setSelectedDateStr(todayStr);
     const [y, m] = todayStr.split('-').map(Number);
     setCurrentDate(new Date(y, m - 1, 1));
-  };
+  }, []);
 
   // Transaction Actions
-  const handleOpenAddModal = () => {
+  const handleOpenAddModal = useCallback(() => {
     if (currentUser?.role !== 'admin' && !checkOrderTimeAllowed()) return;
     setEditingTransaction(null);
     setShowOrderModal(true);
-  };
+  }, [currentUser]);
 
-  const handleEditTransaction = (tx: Transaction) => {
+  const handleEditTransaction = useCallback((tx: Transaction) => {
     setEditingTransaction(tx);
     setShowOrderModal(true);
-  };
+  }, []);
 
-  const handleDeleteTransaction = async (id: string) => {
-    const target = transactions.find(t => t.id === id);
-    const updated = transactions.filter(t => t.id !== id);
-    setTransactions(updated);
-    await saveTransactionsToIndexedDB(updated);
-    if (target) {
-      await deleteOrderFromFirebase(target);
-    }
-  };
+  const handleDeleteTransaction = useCallback(async (id: string) => {
+    setTransactions(prev => {
+      const target = prev.find(t => t.id === id);
+      const updated = prev.filter(t => t.id !== id);
+      saveTransactionsToIndexedDB(updated).catch(console.warn);
+      if (target) {
+        deleteOrderFromFirebase(target).catch(console.warn);
+      }
+      return updated;
+    });
+  }, []);
 
-  const handleUpdateTransaction = async (updatedTx: Transaction) => {
-    const updated = transactions.map(t => t.id === updatedTx.id ? updatedTx : t);
-    setTransactions(updated);
-    await saveTransactionsToIndexedDB(updated);
+  const handleUpdateTransaction = useCallback(async (updatedTx: Transaction) => {
+    setTransactions(prev => {
+      const updated = prev.map(t => t.id === updatedTx.id ? updatedTx : t);
+      saveTransactionsToIndexedDB(updated).catch(console.warn);
+      return updated;
+    });
     if (currentUser?.isFirebaseLinked) {
       try {
         await saveOrderToFirebase(updatedTx);
@@ -348,48 +351,116 @@ export default function App() {
         console.warn('Firebase sync error on update:', e);
       }
     }
-  };
+  }, [currentUser?.isFirebaseLinked]);
 
-  const handleToggleComplete = async (id: string) => {
+  const handleToggleComplete = useCallback(async (id: string) => {
     let targetTx: Transaction | undefined;
-    const updated = transactions.map(t => {
-      if (t.id === id) {
-        const isComp = (t.status || '').trim() !== '';
-        targetTx = { ...t, status: isComp ? '' : '완료' };
-        return targetTx;
+    setTransactions(prev => {
+      const updated = prev.map(t => {
+        if (t.id === id) {
+          const isComp = (t.status || '').trim() !== '';
+          targetTx = { ...t, status: isComp ? '' : '완료' };
+          return targetTx;
+        }
+        return t;
+      });
+      if (targetTx) {
+        updateTransactionInIndexedDB(targetTx).catch(console.warn);
+        saveOrderToFirebase(targetTx).catch(e => console.warn('Firebase sync on toggle complete error:', e));
       }
-      return t;
+      return updated;
     });
-    React.startTransition(() => { setTransactions(updated); });
-    if (targetTx) {
-      updateTransactionInIndexedDB(targetTx).catch(console.warn);
-      try {
-        await saveOrderToFirebase(targetTx);
-      } catch (e) {
-        console.warn('Firebase sync on toggle complete error:', e);
-      }
-    }
-  };
+  }, []);
 
-  const handleCompleteTransaction = async (id: string) => {
+  const handleCompleteTransaction = useCallback(async (id: string) => {
     let targetTx: Transaction | undefined;
-    const updated = transactions.map(t => {
-      if (t.id === id) {
-        targetTx = { ...t, status: '주문찾기' };
-        return targetTx;
+    setTransactions(prev => {
+      const updated = prev.map(t => {
+        if (t.id === id) {
+          targetTx = { ...t, status: '주문찾기' };
+          return targetTx;
+        }
+        return t;
+      });
+      if (targetTx) {
+        updateTransactionInIndexedDB(targetTx).catch(console.warn);
+        saveOrderToFirebase(targetTx).catch(e => console.warn('Firebase sync on complete error:', e));
       }
-      return t;
+      return updated;
     });
-    React.startTransition(() => { setTransactions(updated); });
-    if (targetTx) {
-      updateTransactionInIndexedDB(targetTx).catch(console.warn);
-      try {
-        await saveOrderToFirebase(targetTx);
-      } catch (e) {
-        console.warn('Firebase sync on complete error:', e);
-      }
+  }, []);
+
+  const handleOpenAiModal = useCallback(() => setShowAiModal(true), []);
+  const handleOpenWorkdayStats = useCallback(() => setShowBuyerWorkdayStatsScreen(true), []);
+  
+  const handleSelectDate = useCallback((dateStr: string, hasData: boolean) => {
+    setSelectedDateStr(dateStr);
+    if (!hasData && currentUser?.role === 'merchant') {
+      if (currentUser?.role !== 'admin' && !checkOrderTimeAllowed()) return;
+      setEditingTransaction(null);
+      setShowOrderModal(true);
     }
-  };
+  }, [currentUser]);
+
+  const handleImportOrders = useCallback((newOrders: Transaction[]) => {
+    setTransactions(prev => {
+      const allTxs = [...prev, ...newOrders];
+      const cleaned = cleanTransactions(allTxs);
+      saveTransactionsToIndexedDB(cleaned);
+      return cleaned;
+    });
+  }, [cleanTransactions]);
+  const handleOpenOrderDetail = useCallback((id: string) => {
+    setTransactions(prev => {
+      const found = prev.find(t => t.id === id);
+      if (found) {
+        setEditingTransaction(found);
+        setShowOrderModal(true);
+      }
+      return prev;
+    });
+  }, []);
+
+  const handleSaveCollection = useCallback(async (colInput: CollectionRecord | CollectionRecord[]) => {
+    const colsToSave = Array.isArray(colInput) ? colInput : [colInput];
+    if (colsToSave.length === 0) return;
+
+    setCollections(prev => {
+      const updated = [...colsToSave, ...prev];
+      saveCollections(updated);
+      return updated;
+    });
+
+    const newTxs: Transaction[] = colsToSave.map((col, idx) => ({
+      id: col.id || `col_tx_${Date.now()}_${idx}`,
+      date: col.date,
+      businessDate: col.date,
+      market: '입금',
+      store: col.store,
+      localManager: col.localManager,
+      income: col.amount,
+      expense: 0,
+      remark: col.note ? `수금 (${col.note})` : '수금',
+      manager: '',
+      region: '',
+      floor: '',
+      room: '',
+      status: '완료',
+      createdAt: new Date().toISOString()
+    }));
+
+    setTransactions(prev => {
+      const updatedTx = [...newTxs, ...prev];
+      saveTransactionsToIndexedDB(updatedTx);
+      // Wait for currentUser? We can just pass currentUser as a dependency
+      return updatedTx;
+    });
+    
+    // Defer the firebase sync to not block
+    if (currentUser?.isFirebaseLinked) {
+      saveOrdersBulkToFirebase(newTxs).catch(console.error);
+    }
+  }, [currentUser?.isFirebaseLinked]);
 
   // Excel Handlers
   const handleExcelExport = () => {
@@ -601,8 +672,8 @@ export default function App() {
         <div className="text-center space-y-2">
           <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
           <p className="text-xs text-slate-500 font-semibold">사입ON 데이터를 불러오는 중...</p>
-        </div>
-      </div>
+    </div>
+    </div>
     );
   }
 
@@ -674,7 +745,7 @@ export default function App() {
               className="border border-slate-300 rounded-xl pl-8 pr-3 py-1.5 bg-slate-50 w-full outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white text-xs"
             />
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
-          </div>
+    </div>
 
           {searchQuery && (
             <button
@@ -693,27 +764,21 @@ export default function App() {
           selectedDateStr={selectedDateStr}
           transactions={filteredTransactions}
           currentUser={currentUser}
-          onOpenAiModal={() => setShowAiModal(true)}
-          onSelectDate={(dateStr, hasData) => {
-            setSelectedDateStr(dateStr);
-            if (!hasData && currentUser.role === 'merchant') {
-              handleOpenAddModal();
-            }
-          }}
+          onOpenAiModal={handleOpenAiModal}
+          onSelectDate={handleSelectDate}
           onChangeMonth={handleChangeMonth}
           onGoToToday={handleGoToToday}
           onOpenAddModal={handleOpenAddModal}
           onEditTransaction={handleEditTransaction}
           onDeleteTransaction={handleDeleteTransaction}
           onCompleteTransaction={handleCompleteTransaction}
-          onOpenWorkdayStats={() => setShowBuyerWorkdayStatsScreen(true)}
-          onImportOrders={(newOrders) => {
-            setCleanTransactions([...transactions, ...newOrders]);
-          }}
+          onOpenWorkdayStats={handleOpenWorkdayStats}
+          onImportOrders={handleImportOrders}
         />
       </main>
 
       {/* Modals */}
+      <Suspense fallback={<div className="hidden">Loading...</div>}>
       {showAdminAddModal && (
         <AdminAddModal
           users={users}
@@ -779,55 +844,12 @@ export default function App() {
             }
           }}
           onResetAllData={handleInitializeData}
-          onOpenOrderDetail={(id) => {
-            const found = transactions.find(t => t.id === id);
-            if (found) {
-              setEditingTransaction(found);
-              setShowOrderModal(true);
-            }
-          }}
+          onOpenOrderDetail={handleOpenOrderDetail}
           onEditTransaction={handleEditTransaction}
           onDeleteTransaction={handleDeleteTransaction}
           onUpdateTransaction={handleUpdateTransaction}
           onToggleComplete={handleToggleComplete}
-          onSaveCollection={async (colInput) => {
-            const colsToSave = Array.isArray(colInput) ? colInput : [colInput];
-            if (colsToSave.length === 0) return;
-
-            setCollections(prev => {
-              const updated = [...colsToSave, ...prev];
-              saveCollections(updated);
-              return updated;
-            });
-
-            // 또한 입금 거래 내역(Transaction)으로도 반영하여 장부와 수금 현황이 일치되도록 동기화
-            const newTxs: Transaction[] = colsToSave.map((col, idx) => ({
-              id: col.id || `col_tx_${Date.now()}_${idx}`,
-              date: col.date,
-              businessDate: col.date,
-              market: '입금',
-              store: col.store,
-              localManager: col.localManager,
-              income: col.amount,
-              expense: 0,
-              remark: col.note ? `수금 (${col.note})` : '수금',
-              manager: '',
-              region: '',
-              floor: '',
-              room: '',
-              status: '완료',
-              createdAt: new Date().toISOString()
-            }));
-
-            setTransactions(prev => {
-              const updatedTx = [...newTxs, ...prev];
-              saveTransactionsToIndexedDB(updatedTx);
-              if (currentUser?.isFirebaseLinked) {
-                saveOrdersBulkToFirebase(newTxs).catch(console.error);
-              }
-              return updatedTx;
-            });
-          }}
+          onSaveCollection={handleSaveCollection}
         />
       )}
 
@@ -1009,9 +1031,11 @@ export default function App() {
         />
       )}
 
+      </Suspense>
     </div>
   );
 }
+      
 // Force update for publish button: Mon Aug 31 03:27:26 AM UTC 2026
 // Verify GitHub sync status: Mon Aug 31 03:57:11 AM UTC 2026
 // Force update for z-index: Mon Aug 31 06:13:55 AM UTC 2026
