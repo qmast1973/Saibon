@@ -21,15 +21,15 @@ export const MARKET_DICTIONARY: { canonical: string; aliases: string[] }[] = [
   { canonical: 'APM', aliases: ['APM', '에이피엠', '에펨', 'APM LUXE', '럭스', 'APM럭스'] },
   { canonical: '청평화', aliases: ['청평화', '청평', '청', 'CPH', 'CHEONGPYEONGHWA'] },
   { canonical: '퀸즈스퀘어', aliases: ['퀸즈스퀘어', '퀸즈', '퀸', 'QUEENS', 'QUEENSSQUARE'] },
-  { canonical: '디자이너클럽', aliases: ['디자이너클럽', '디자이너', '디클', 'DC', 'DESIGNER'] },
+  { canonical: '디자이너클럽', aliases: ['디자이너클럽', '디자이너', '디클', 'DC', 'DESIGNER', 'D'] },
   { canonical: '벨포스트', aliases: ['벨포스트', '벨포', '벨', 'BELPOST'] },
   { canonical: '누죤', aliases: ['누죤', '누존', '누', 'NUZZON', 'NUZON'] },
   { canonical: '테크노', aliases: ['테크노', '테크', '테', 'TECHNO'] },
   { canonical: '동평화', aliases: ['동평화', '동평', '동', 'DONGPYEONGHWA', 'DPH'] },
   { canonical: '남평화', aliases: ['남평화', '남평', '남', 'NAMPYEONGHWA', 'NPH'] },
   { canonical: '신평화', aliases: ['신평화', '신평', '신', 'SHINPYEONGHWA', 'SPH'] },
-  { canonical: '제일평화', aliases: ['제일평화', '제평', '제', 'JEIL', 'JPH'] },
-  { canonical: 'DDP패션몰', aliases: ['DDP패션몰', 'DDP', '유어스', 'UUS', 'DDP FASHION'] },
+  { canonical: '제일평화', aliases: ['제일평화', '제평', '제', 'JEIL', 'JPH', 'J'] },
+  { canonical: '유어스', aliases: ['유어스', 'UUS', 'DDP패션몰', 'DDP', 'DDP FASHION'] },
   { canonical: '스튜디오W', aliases: ['스튜디오W', '스튜디오더블유', '스튜디오', 'SW', 'STUDIO W'] },
   { canonical: '아트프라자', aliases: ['아트프라자', '아트', 'ART'] },
   { canonical: '광희패션몰', aliases: ['광희패션몰', '광희', '광'] },
@@ -76,13 +76,26 @@ export function matchMarketName(token: string): { canonical: string; matchedAlia
     }
   }
 
-  // 2. 부분 일치: 단, 한 글자 약어('청', '신', '남' 등)는 일반 단어(요청, 신청 등) 오인 방지를 위해 부분 일치 금지!
-  // 최소 2글자 이상 별칭만 candidate.includes(uAlias) 허용
+  // 2. 부분 일치: 단, 한 글자 약어('청', '신', '남' 등)는 일반 단어(요청, 신청 등) 오인 방지를 위해 기본적으로 부분 일치 금지!
+  // 단, 영문 1글자(예: 'D')는 숫자나 한글 등 다른 문자와 붙어있을 때 단독으로 인식할 수 있도록 허용
   for (const entry of MARKET_DICTIONARY) {
     const sortedAliases = [...entry.aliases].sort((a, b) => b.length - a.length);
     for (const alias of sortedAliases) {
-      if (alias.length < 2) continue; // 1글자 약어는 완전 일치일 때만 인정
       const uAlias = alias.toUpperCase();
+      
+      if (alias.length < 2) {
+        // 영문 1글자(예: D)인 경우에만 부분 일치 허용 (맨 앞이거나 기호 뒤)
+        if (/^[A-Za-z]$/.test(alias)) {
+          for (const cand of candidates) {
+            const regex = new RegExp(`(^|[^A-Za-z])${alias}(?![A-Za-z])`, 'i');
+            if (regex.test(cand)) {
+              return { canonical: entry.canonical, matchedAlias: alias };
+            }
+          }
+        }
+        continue;
+      }
+
       for (const cand of candidates) {
         if (cand.includes(uAlias)) {
           return { canonical: entry.canonical, matchedAlias: alias };
@@ -367,6 +380,26 @@ export function parseSmartOrderText(
       // 층/호수에 매칭된 단어들을 남은 텍스트에서 제거
       const cleanedRest = restText.replace(frResult.matchedText, ' ').trim();
       remainingTokens = cleanedRest.split(/\s+/).filter(Boolean);
+    }
+
+    // A-2. 만약 A단계에서 건물명을 못 찾았다면, B단계에서 층/호수를 지운 나머지 텍스트로 다시 한 번 건물명(특히 1글자 영문 약어) 탐색
+    if (!detectedMarket) {
+      for (let i = 0; i < remainingTokens.length; i++) {
+        const match = matchMarketName(remainingTokens[i]);
+        if (match) {
+          detectedMarket = match.canonical;
+          const token = remainingTokens[i];
+          const aliasRegex = new RegExp(match.matchedAlias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+          const replaced = token.replace(aliasRegex, ' ').trim();
+          if (replaced) {
+            const newPieces = replaced.split(/\s+/);
+            remainingTokens.splice(i, 1, ...newPieces);
+          } else {
+            remainingTokens.splice(i, 1);
+          }
+          break;
+        }
+      }
     }
 
     // C. 남은 토큰에서 상호 및 비고 분리
