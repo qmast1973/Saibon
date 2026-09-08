@@ -4,6 +4,7 @@ export interface ParsedOrderItem {
   id: string;
   rawText: string;
   store: string;
+  groupStore?: string;
   market: string;
   floor: string;
   room: string;
@@ -99,7 +100,7 @@ export function matchMarketName(token: string): { canonical: string; matchedAlia
  */
 export function parseFloorAndRoom(text: string): { floor: string; room: string; matchedText: string } | null {
   // 1. 지하 / B층 패턴 (예: B1-12, B1 12호, 지하1층 5호, 지1 5, B2-45)
-  const bPattern = /(?:지하\s*(\d+)|지\s*(\d+)|B\s*(\d+)|b\s*(\d+))(?:\s*층|\s*F)?[\s\-\/\.호]+([가-힣A-Za-z0-9\s\-]+?)(?:\s*호|$|\s+(?=[가-힣A-Za-z]))/i;
+  const bPattern = /(?:지하\s*(\d+)|지\s*(\d+)|B\s*(\d+)|b\s*(\d+))(?:(?:\s*층|\s*F|\s*f)[\s\-\/\.호~]*|[\s\-\/\.호~]*)([가-힣A-Za-z0-9\s\-~]+?)(?:\s*호|$|\s+(?=[가-힣A-Za-z]))/i;
   const bMatch = text.match(bPattern);
   if (bMatch && (bMatch[1] || bMatch[2] || bMatch[3] || bMatch[4])) {
     const floorNum = bMatch[1] || bMatch[2] || bMatch[3] || bMatch[4];
@@ -112,7 +113,7 @@ export function parseFloorAndRoom(text: string): { floor: string; room: string; 
   }
 
   // 2. 일반 지상층 + 호수 패턴 (예: 3-12, 3/12, 3.12, 3층 12호, 3F 12호, 4층 가동 15호, 3층 C열 12호)
-  const standardPattern = /(\d+)(?:\s*층|\s*F|\s*f)?[\s\-\/\.호]+([가-힣A-Za-z0-9\s\-]+?)(?:\s*호|$|\s+(?=[가-힣A-Za-z]))/;
+  const standardPattern = /(\d+)(?:(?:\s*층|\s*F|\s*f)[\s\-\/\.호~]*|[\-\/\.])([가-힣A-Za-z0-9\s\-~]+?)(?:\s*호|$|\s+(?=[가-힣A-Za-z]))/;
   const stdMatch = text.match(standardPattern);
   if (stdMatch) {
     const floor = `${stdMatch[1]}층`;
@@ -226,7 +227,7 @@ export function parseSmartOrderText(
     }
 
     // 1. 주문내용 접두어 제거 (예: "📍주문내용 : 1. APM / 1층 28 ...")
-    let cleanLine = rawLine.replace(/^(?:[\[★■▶◆\*●📍📌🏷️🏢🏪\s]*)(?:주문내용|주문상세|주문목록|주문서|주문)\s*[:：]?\s*/i, '').trim();
+    let cleanLine = rawLine.replace(/^(?:[\[★■▶◆\*●📍📌🏷️🏢🏪\s]*)(?:주문내용|주문상세|주문목록|주문서|주문)\s*[:：~-]?\s*/i, '').trim();
 
     // 2. 줄 번호 제거 (예: "1. ", "1) ", "① ")
     cleanLine = cleanLine.replace(/^(\d+[\.\)]|[①-⑳]|[\-\*\•])\s*/, '').trim();
@@ -251,33 +252,30 @@ export function parseSmartOrderText(
           const fr = parseFloorAndRoom(parts[1] || '');
           if (fr && fr.room) {
             floor = fr.floor;
-            const wholesaleStore = parts[2] || '';
-            room = fr.room + (wholesaleStore ? ` (${wholesaleStore})` : '');
-            store = currentGroupStore || '상호 미지정';
+            room = fr.room;
+            store = parts[2] || '상호 미지정';
             remark = parts.slice(3).join(' / ');
           } else {
             // Market / Floor / Room / Store / Remark
             floor = parts[1] || '';
-            const wholesaleStore = parts[3] || '';
-            room = (parts[2] || '') + (wholesaleStore ? ` (${wholesaleStore})` : '');
-            store = currentGroupStore || '상호 미지정';
+            room = parts[2] || '';
+            store = parts[3] || '상호 미지정';
             remark = parts.slice(4).join(' / ');
           }
         } else {
           // Store / Market / Floor / Room / Remark
-          const wholesaleStore = parts[0] || '';
-          store = currentGroupStore || '상호 미지정';
+          store = parts[0] || '상호 미지정';
           const secondAsMarket = matchMarketName(parts[1] || '');
           market = secondAsMarket ? secondAsMarket.canonical : (parts[1] || '');
           
           const fr = parseFloorAndRoom(parts[2] || '');
           if (fr && fr.room) {
             floor = fr.floor;
-            room = fr.room + (wholesaleStore ? ` (${wholesaleStore})` : '');
+            room = fr.room;
             remark = parts.slice(3).join(' / ');
           } else {
             floor = parts[2] || '';
-            room = (parts[3] || '') + (wholesaleStore ? ` (${wholesaleStore})` : '');
+            room = parts[3] || '';
             remark = parts.slice(4).join(' / ');
           }
         }
@@ -295,6 +293,7 @@ export function parseSmartOrderText(
           id: `parsed_${Date.now()}_${lineIndex}_${Math.random().toString(36).substring(2, 6)}`,
           rawText: rawLine,
           store: store.trim(),
+          groupStore: currentGroupStore,
           market: market.trim(),
           floor: floor.trim(),
           room: room.trim(),
@@ -311,7 +310,7 @@ export function parseSmartOrderText(
     // 예: "APM 7F 45 아워룸 단가 15000"
     // 예: "청 B1-5 리썸"
 
-    let detectedStore = currentGroupStore || '';
+    let detectedStore = '';
     let detectedMarket = '';
     let detectedFloor = '';
     let detectedRoom = '';
@@ -328,7 +327,17 @@ export function parseSmartOrderText(
       if (match) {
         detectedMarket = match.canonical;
         marketFoundIndex = i;
-        remainingTokens.splice(i, 1);
+        
+        // 만약 띄어쓰기 없이 붙어있는 경우(예: 디오트4층G16), 건물명만 지우고 나머지는 남김
+        const token = remainingTokens[i];
+        const aliasRegex = new RegExp(match.matchedAlias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+        const replaced = token.replace(aliasRegex, ' ').trim();
+        if (replaced) {
+          const newPieces = replaced.split(/\s+/);
+          remainingTokens.splice(i, 1, ...newPieces);
+        } else {
+          remainingTokens.splice(i, 1);
+        }
         break;
       }
     }
@@ -362,17 +371,15 @@ export function parseSmartOrderText(
 
     // C. 남은 토큰에서 상호 및 비고 분리
     if (remainingTokens.length > 0) {
-      if (!detectedStore) {
-        // 첫 번째 남은 단어를 상호로 배정
-        detectedStore = remainingTokens[0];
-        remainingTokens.shift();
-      }
+      // 항상 첫 번째 남은 단어를 도매 상호로 배정
+      detectedStore = remainingTokens[0];
+      remainingTokens.shift();
       // 나머지는 비고/주문내용으로 배정
       detectedRemark = remainingTokens.join(' ');
     }
 
     if (!detectedStore) {
-      detectedStore = defaultStoreName || '상호 미지정';
+      detectedStore = '상호 미지정';
     }
 
     // 결과 판정
@@ -387,6 +394,7 @@ export function parseSmartOrderText(
         id: `parsed_${Date.now()}_${lineIndex}_${Math.random().toString(36).substring(2, 6)}`,
         rawText: rawLine,
         store: detectedStore.trim(),
+        groupStore: currentGroupStore,
         market: detectedMarket.trim(),
         floor: detectedFloor.trim(),
         room: detectedRoom.trim(),

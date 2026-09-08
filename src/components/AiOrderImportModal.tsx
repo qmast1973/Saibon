@@ -12,55 +12,6 @@ interface AiOrderImportModalProps {
   currentUser: any;
 }
 
-const SAMPLE_PRESETS = [
-  {
-    title: '신상마켓 요청서',
-    text: `📩 신상마켓 사입 요청서 도착
-
-애비뉴261으로부터 사입 요청서가 도착했습니다.
-
-1개중 1번째 주문서입니다.
-
-📍소매명 : 애비뉴261
-📍주문내용 : 1. APM / 1층 28 / 레이크(LAKE) / 대납
-
-2. CPH(청평화) / 지하1층 라23 / 제이런 (J-run, Jrun) / 대납
-
-3. 제일평화 / 5층 124 / 플라스틱 / 대납
-
-
-☎️ 관련해서 문의사항이 있으신 경우 02-1661-1916 또는 신상마켓 카카오채널로 연락 부탁드려요!`
-  },
-  {
-    title: '상호 하단형 (줄바꿈 비고)',
-    text: `디오트 4층 G16 레귤러
-주문건
-
-디오트 지하 1층 H12 엘브이씨
-주문건
-
-디오트 2층 D15 어니언
-샘플건
-
-엔니크`
-  },
-  {
-    title: '삼촌 문자 (상단 상호)',
-    text: `● 소매 : 비바글램
-
-1. APM / 2층 18 / 바이보미 / 대납
-2. CPH(청평화) / 1층 라26 / 파스텔 / 대납
-3. NPH(남평화) / 지하1층 구관118 / 꿀딴지 / 대납`
-  },
-  {
-    title: '상호 그룹형',
-    text: `초코송이마켓
-디오트 3층 12호
-청평화 1층 가동 5호 니트 1개
-퀸즈스퀘어 4층 102호 스커트`
-  }
-];
-
 export const AiOrderImportModal: React.FC<AiOrderImportModalProps> = ({
   isOpen,
   onClose,
@@ -116,9 +67,15 @@ export const AiOrderImportModal: React.FC<AiOrderImportModalProps> = ({
     try {
       const newTransactions: Transaction[] = parsedRows.map((order, index) => {
         const market = normalizeMarketName(order.market || '');
-        const store = (order.store || defaultStore || '상호 미지정').trim();
+        const retailStore = (order.groupStore || defaultStore || '상호 미지정').trim();
+        const wholesaleStore = (order.store || '').trim();
         const floor = (order.floor || '').trim();
-        const room = (order.room || '').trim();
+        let room = (order.room || '').trim();
+
+        if (wholesaleStore && wholesaleStore !== '상호 미지정' && wholesaleStore !== '~') {
+          room = room ? `${room} (${wholesaleStore})` : wholesaleStore;
+        }
+
         const remark = (order.remark || '').trim();
 
         const orderId = `item_ai_${Date.now()}_${index}_${Math.random().toString(36).substring(2, 6)}`;
@@ -130,7 +87,8 @@ export const AiOrderImportModal: React.FC<AiOrderImportModalProps> = ({
           date: selectedDateStr,
           businessDate: selectedDateStr,
           region: '',
-          store,
+          store: retailStore,
+          merchantStoreName: retailStore,
           market,
           floor,
           room,
@@ -186,24 +144,6 @@ export const AiOrderImportModal: React.FC<AiOrderImportModalProps> = ({
         {/* Content Body */}
         <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4">
           
-          {/* Quick Preset Buttons */}
-          <div className="flex flex-wrap items-center gap-2 bg-gray-950/60 p-3 rounded-xl border border-gray-800">
-            <span className="text-xs font-semibold text-gray-400 flex items-center gap-1">
-              <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
-              테스트 예시 클릭:
-            </span>
-            {SAMPLE_PRESETS.map((preset, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => setTextInput(preset.text)}
-                className="text-xs bg-gray-800 hover:bg-blue-600/30 hover:border-blue-500/50 hover:text-blue-300 text-gray-300 px-2.5 py-1 rounded-lg border border-gray-700 transition-all font-medium"
-              >
-                {preset.title}
-              </button>
-            ))}
-          </div>
-
           {/* Grid Layout: Left Input / Right Live Result */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
             
@@ -271,15 +211,26 @@ export const AiOrderImportModal: React.FC<AiOrderImportModalProps> = ({
                         </div>
 
                         {/* Editable Field Inputs */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                           <div>
-                            <span className="text-[10px] text-gray-500 block mb-0.5">상호(소매)</span>
+                            <span className="text-[10px] text-gray-500 block mb-0.5">상호(바이어/소매)</span>
+                            <input
+                              type="text"
+                              value={row.groupStore || ''}
+                              onChange={(e) => handleRowChange(idx, 'groupStore', e.target.value)}
+                              className="w-full bg-gray-950 border border-gray-700 rounded px-2 py-1 text-gray-400 font-medium focus:border-blue-500 focus:outline-none"
+                              placeholder="바이어"
+                            />
+                          </div>
+
+                          <div>
+                            <span className="text-[10px] text-emerald-400 font-semibold block mb-0.5">상호(도매처)</span>
                             <input
                               type="text"
                               value={row.store}
                               onChange={(e) => handleRowChange(idx, 'store', e.target.value)}
-                              className="w-full bg-gray-950 border border-gray-700 rounded px-2 py-1 text-white font-medium focus:border-blue-500 focus:outline-none"
-                              placeholder="상호"
+                              className="w-full bg-gray-950 border border-emerald-500/40 rounded px-2 py-1 text-emerald-300 font-bold focus:border-blue-500 focus:outline-none"
+                              placeholder="도매처"
                             />
                           </div>
 
