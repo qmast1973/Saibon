@@ -7,8 +7,8 @@ import { GoogleGenAI, Type } from "@google/genai";
 function fallbackParseOrders(text: string) {
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   const results: Array<{ market: string; floor: string; room: string; store: string; remark: string }> = [];
-
   let currentStore = '';
+
   const knownMarkets = [
     'APM플레이스', 'APM 럭스', 'APM', '디오트', '청평화', '퀸즈스퀘어', '디자이너클럽',
     '벨포스트', '누죤', '테크노', '동평화', '남평화', '신평화', '제일평화', 'DDP패션몰',
@@ -18,24 +18,47 @@ function fallbackParseOrders(text: string) {
 
   for (const line of lines) {
     // Check for store header like [초코송이마켓] or 상호: 초코송이
-    const storeHeader = line.match(/^\[([^\]]+)\]|^상호\s*[:：]\s*(.+)$/);
+    const storeHeader = line.match(/^\[([^\]]+)\]|^상호\s*[:：]\s*(.+)$|^●?\s*소매\s*[:：]\s*(.+)$/);
     if (storeHeader) {
-      currentStore = (storeHeader[1] || storeHeader[2] || '').trim();
+      currentStore = (storeHeader[1] || storeHeader[2] || storeHeader[3] || '').trim();
       continue;
     }
 
-    // Slash format: store / market / floor / room / remark
+    // Slash format
     if (line.includes('/')) {
       const parts = line.split('/').map(p => p.trim());
       if (parts.length >= 3) {
-        results.push({
-          store: parts[0] || currentStore || '상호 미지정',
-          market: parts[1] || '',
-          floor: parts[2] || '',
-          room: parts[3] || '',
-          remark: parts.slice(4).join(' ') || ''
-        });
-        continue;
+        // Format B: 1. APM / 2층 18 / 바이보미 / 대납 (Market / Floor Room / Store / Remark)
+        if (parts[1].includes('층') || parts[1].match(/^[B\d]/i)) {
+           const marketStr = parts[0].replace(/^\d+\.\s*/, '').replace(/^[A-Za-z0-9]+\(([^)]+)\)$/, '$1').trim(); // e.g., "CPH(청평화)" -> "청평화"
+           
+           const floorMatch = parts[1].match(/^([^층\s]+층|지하\s*\d+층|B\d+층?)\s*(.*)/i);
+           const floor = floorMatch ? floorMatch[1] : parts[1].split(' ')[0];
+           const room = floorMatch ? floorMatch[2] : parts[1].split(' ').slice(1).join(' ');
+           
+           const wholesaleStore = parts[2] || '';
+           const remark = parts.slice(3).join(' ') || '';
+           
+           results.push({
+               store: currentStore || '상호 미지정',
+               market: marketStr,
+               floor: floor.trim(),
+               room: room.trim() + (wholesaleStore ? ` (${wholesaleStore})` : ''),
+               remark: remark
+           });
+           continue;
+        } else {
+          // Format A: Store / Market / Floor / Room / Remark
+          const wholesaleStore = parts[0] || '';
+          results.push({
+            store: currentStore || '상호 미지정',
+            market: parts[1] || '',
+            floor: parts[2] || '',
+            room: (parts[3] || '') + (wholesaleStore ? ` (${wholesaleStore})` : ''),
+            remark: parts.slice(4).join(' ') || ''
+          });
+          continue;
+        }
       }
     }
 
@@ -118,9 +141,16 @@ Text:
 ${text}
 """
 
+The text may include retail store names (e.g., "● 소매 : 비바글램") and numbered lists.
+A common format is: "[Index]. [Market] / [Floor] [Room] / [Wholesale Store] / [Remark]" (e.g., "1. APM / 2층 18 / 바이보미 / 대납").
+Another format: "[Wholesale Store] / [Market] / [Floor] / [Room] / [Remark]".
 Each order usually contains: market name, floor, room/store number, store name, and any notes/amounts.
 Set the status as '미완료' (uncompleted) and record type as '대납' if it mentions payment, or parse accordingly.
-Make sure to parse market, floor, room, store precisely.`;
+
+IMPORTANT RULES FOR "store" and "room" FIELDS:
+- The "store" field MUST contain the RETAIL STORE name (소매상호, e.g., "비바글램"). If it is not explicitly declared, use "상호 미지정".
+- The "room" field MUST contain the room number PLUS the WHOLESALE STORE name (도매상호) in parenthesis if available. E.g., "18호 (바이보미)".
+Make sure to parse market, floor, room precisely.`;
 
     const schemaConfig = {
       responseMimeType: "application/json",

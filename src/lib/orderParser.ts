@@ -24,10 +24,10 @@ export const MARKET_DICTIONARY: { canonical: string; aliases: string[] }[] = [
   { canonical: '벨포스트', aliases: ['벨포스트', '벨포', '벨', 'BELPOST'] },
   { canonical: '누죤', aliases: ['누죤', '누존', '누', 'NUZZON', 'NUZON'] },
   { canonical: '테크노', aliases: ['테크노', '테크', '테', 'TECHNO'] },
-  { canonical: '동평화', aliases: ['동평화', '동평', '동', 'DONGPYEONGHWA'] },
-  { canonical: '남평화', aliases: ['남평화', '남평', '남', 'NAMPYEONGHWA'] },
-  { canonical: '신평화', aliases: ['신평화', '신평', '신', 'SHINPYEONGHWA'] },
-  { canonical: '제일평화', aliases: ['제일평화', '제평', '제', 'JEIL'] },
+  { canonical: '동평화', aliases: ['동평화', '동평', '동', 'DONGPYEONGHWA', 'DPH'] },
+  { canonical: '남평화', aliases: ['남평화', '남평', '남', 'NAMPYEONGHWA', 'NPH'] },
+  { canonical: '신평화', aliases: ['신평화', '신평', '신', 'SHINPYEONGHWA', 'SPH'] },
+  { canonical: '제일평화', aliases: ['제일평화', '제평', '제', 'JEIL', 'JPH'] },
   { canonical: 'DDP패션몰', aliases: ['DDP패션몰', 'DDP', '유어스', 'UUS', 'DDP FASHION'] },
   { canonical: '스튜디오W', aliases: ['스튜디오W', '스튜디오더블유', '스튜디오', 'SW', 'STUDIO W'] },
   { canonical: '아트프라자', aliases: ['아트프라자', '아트', 'ART'] },
@@ -45,15 +45,18 @@ export const MARKET_DICTIONARY: { canonical: string; aliases: string[] }[] = [
  * 텍스트에서 건물명을 탐지하여 표준 명칭으로 변환
  */
 export function matchMarketName(token: string): { canonical: string; matchedAlias: string } | null {
-  const clean = token.trim().toUpperCase();
-  if (!clean) return null;
+  // 괄호 안의 내용 제거 (예: "CPH(청평화)" -> "CPH")
+  const clean = token.replace(/\([^)]*\)/g, '').trim().toUpperCase();
+  const rawClean = token.trim().toUpperCase(); // 원래 문자열(괄호 포함) 대문자
+  if (!clean && !rawClean) return null;
 
   // 1. 긴 별칭부터 우선 검사 (예: 'APM플레이스'가 'APM'보다 먼저 매칭되도록)
   for (const entry of MARKET_DICTIONARY) {
     const sortedAliases = [...entry.aliases].sort((a, b) => b.length - a.length);
     for (const alias of sortedAliases) {
       const uAlias = alias.toUpperCase();
-      if (clean === uAlias) {
+      // 정확히 일치하거나, 괄호를 제거한 텍스트가 일치하는 경우
+      if (clean === uAlias || rawClean === uAlias || clean.includes(uAlias)) {
         return { canonical: entry.canonical, matchedAlias: alias };
       }
     }
@@ -68,13 +71,13 @@ export function matchMarketName(token: string): { canonical: string; matchedAlia
  */
 export function parseFloorAndRoom(text: string): { floor: string; room: string; matchedText: string } | null {
   // 1. 지하 / B층 패턴 (예: B1-12, B1 12호, 지하1층 5호, 지1 5, B2-45)
-  const bPattern = /(?:지하\s*(\d+)|지\s*(\d+)|B\s*(\d+)|b\s*(\d+))(?:\s*층|\s*F)?[\s\-\/\.호]*(?:([가-힣A-Za-z]?\s*[\d\-]+)(?:\s*호)?)?/i;
+  const bPattern = /(?:지하\s*(\d+)|지\s*(\d+)|B\s*(\d+)|b\s*(\d+))(?:\s*층|\s*F)?[\s\-\/\.호]+([가-힣A-Za-z0-9\s\-]+?)(?:\s*호|$|\s+(?=[가-힣A-Za-z]))/i;
   const bMatch = text.match(bPattern);
   if (bMatch && (bMatch[1] || bMatch[2] || bMatch[3] || bMatch[4])) {
     const floorNum = bMatch[1] || bMatch[2] || bMatch[3] || bMatch[4];
     const floor = `지하${floorNum}층`;
     let room = bMatch[5] ? bMatch[5].trim() : '';
-    if (room && !room.endsWith('호') && !isNaN(Number(room))) {
+    if (room && !room.endsWith('호') && /^\d+$/.test(room)) {
       room = `${room}호`;
     }
     return { floor, room, matchedText: bMatch[0] };
@@ -120,8 +123,14 @@ export function parseSmartOrderText(
     let rawLine = lines[lineIndex].trim();
     if (!rawLine) continue;
 
-    // 템플릿 헤더나 가이드라인 스킵
-    if (rawLine.includes('상호/건물명/층/호수') || rawLine.startsWith('===') || rawLine.startsWith('---')) {
+    // 템플릿 헤더나 가이드라인, 링크 스킵
+    if (
+      rawLine.includes('상호/건물명/층/호수') || 
+      rawLine.startsWith('===') || 
+      rawLine.startsWith('---') ||
+      rawLine.includes('http://') ||
+      rawLine.includes('https://')
+    ) {
       continue;
     }
 
@@ -130,14 +139,14 @@ export function parseSmartOrderText(
       isFirstLine = false;
       if (!rawLine.includes('/')) {
         // [상호] 같은 대괄호나 특수기호를 제거하고 상호로 취급
-        const cleanStoreName = rawLine.replace(/^[\[★■▶◆\*]+|[\]★■▶◆\*]+$/g, '').replace(/^(소매|상호)\s*:\s*/, '').trim();
+        const cleanStoreName = rawLine.replace(/^[\[★■▶◆\*●\s]+|[\]★■▶◆\*●\s]+$/g, '').replace(/^(?:소매|상호)\s*[:：]?\s*/, '').trim();
         currentGroupStore = cleanStoreName;
         continue;
       }
     }
 
     // 소매 상호 그룹 헤더 감지 (두번째 줄 이후에 또 명시적으로 [상호] 형태로 입력할 경우를 위해 유지)
-    const storeHeaderMatch = rawLine.match(/^(?:\[|★|■|▶|◆|\*|소매\s*:\s*|상호\s*:\s*)([가-힣A-Za-z0-9_\s]{2,20})(?:\]|★|■|▶|◆|\*)?$/);
+    const storeHeaderMatch = rawLine.match(/^(?:\[|★|■|▶|◆|\*|●?\s*소매\s*[:：]?\s*|상호\s*[:：]?\s*)([가-힣A-Za-z0-9_\s]{2,20})(?:\]|★|■|▶|◆|\*)?$/);
     if (storeHeaderMatch) {
       const candidate = storeHeaderMatch[1].trim();
       // 건물명이 아니라 상호인 경우에만 그룹 상호로 갱신
@@ -165,25 +174,48 @@ export function parseSmartOrderText(
         const firstAsMarket = matchMarketName(parts[0]);
         if (firstAsMarket) {
           market = firstAsMarket.canonical;
-          store = currentGroupStore || '상호 미지정';
-          floor = parts[1] || '';
-          room = parts[2] || '';
-          remark = parts.slice(3).join(' / ');
+          
+          // parts[1]이 층/호수를 모두 포함하는지 확인 (예: "2층 18")
+          const fr = parseFloorAndRoom(parts[1] || '');
+          if (fr && fr.room) {
+            floor = fr.floor;
+            const wholesaleStore = parts[2] || '';
+            room = fr.room + (wholesaleStore ? ` (${wholesaleStore})` : '');
+            store = currentGroupStore || '상호 미지정';
+            remark = parts.slice(3).join(' / ');
+          } else {
+            // Market / Floor / Room / Store / Remark
+            floor = parts[1] || '';
+            const wholesaleStore = parts[3] || '';
+            room = (parts[2] || '') + (wholesaleStore ? ` (${wholesaleStore})` : '');
+            store = currentGroupStore || '상호 미지정';
+            remark = parts.slice(4).join(' / ');
+          }
         } else {
-          store = parts[0] || currentGroupStore || '상호 미지정';
+          // Store / Market / Floor / Room / Remark
+          const wholesaleStore = parts[0] || '';
+          store = currentGroupStore || '상호 미지정';
           const secondAsMarket = matchMarketName(parts[1] || '');
           market = secondAsMarket ? secondAsMarket.canonical : (parts[1] || '');
-          floor = parts[2] || '';
-          room = parts[3] || '';
-          remark = parts.slice(4).join(' / ');
+          
+          const fr = parseFloorAndRoom(parts[2] || '');
+          if (fr && fr.room) {
+            floor = fr.floor;
+            room = fr.room + (wholesaleStore ? ` (${wholesaleStore})` : '');
+            remark = parts.slice(3).join(' / ');
+          } else {
+            floor = parts[2] || '';
+            room = (parts[3] || '') + (wholesaleStore ? ` (${wholesaleStore})` : '');
+            remark = parts.slice(4).join(' / ');
+          }
         }
 
         // 층/호수 보정 (예: floor에 "3-12"가 들어온 경우)
         if (floor && !room) {
-          const fr = parseFloorAndRoom(floor);
-          if (fr) {
-            floor = fr.floor;
-            room = fr.room;
+          const fr2 = parseFloorAndRoom(floor);
+          if (fr2 && fr2.room) {
+            floor = fr2.floor;
+            room = fr2.room;
           }
         }
 
