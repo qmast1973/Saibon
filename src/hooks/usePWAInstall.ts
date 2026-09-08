@@ -29,7 +29,7 @@ export function usePWAInstall() {
     }
 
     const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
+      // e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
       (window as any).deferredPWAInstallPrompt = e;
     };
