@@ -6,7 +6,7 @@ import { defineConfig } from 'vite';
 
 export default defineConfig(() => {
   return {
-    base: '/', // PWA 서비스 워커 정상 작동을 위해 절대경로로 복구
+    base: './', // 깃허브 배포를 위한 상대 경로 설정
     plugins: [
       react(),
       tailwindcss(),
@@ -17,30 +17,30 @@ export default defineConfig(() => {
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MiB
         },
         manifest: {
-          id: '/',
+          id: './',
           name: '사입ON 앱',
           short_name: '사입ON',
           description: '사입ON PWA 앱',
           theme_color: '#4f46e5',
           background_color: '#ffffff',
           display: 'standalone',
-          start_url: '/',
-          scope: '/',
+          start_url: '.',
+          scope: '.',
           icons: [
             {
-              src: '/pwa-192x192.png',
+              src: 'pwa-192x192.png',
               sizes: '192x192',
               type: 'image/png',
               purpose: 'any',
             },
             {
-              src: '/pwa-512x512.png',
+              src: 'pwa-512x512.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'any',
             },
             {
-              src: '/pwa-maskable-512x512.png',
+              src: 'pwa-maskable-512x512.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'maskable',
