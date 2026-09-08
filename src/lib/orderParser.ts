@@ -144,7 +144,27 @@ export function parseSmartOrderText(
 
   const lines = inputText.split('\n');
   const results: ParsedOrderItem[] = [];
-  let currentGroupStore = defaultStoreName.trim();
+  
+  // 텍스트 맨 아래에 상호(바이어명)가 적혀있는 포맷 감지 (Footer Store)
+  let footerStoreName = '';
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const text = lines[i].trim();
+    if (!text) continue;
+    if (text.startsWith('===') || text.startsWith('---') || text.includes('http')) continue;
+    
+    // 하단 줄에 건물명이나 층/호수가 포함되어 있으면 주문 내역의 끝이므로 상호가 없는 것으로 간주
+    if (matchMarketName(text) || parseFloorAndRoom(text)) {
+      break; 
+    }
+    
+    // 15자 이내의 짧은 텍스트이고 주문/샘플 등의 키워드가 아니면 하단 상호로 간주
+    if (text.length > 0 && text.length <= 15 && !/주문|샘플|교환|미송|반품|신상/i.test(text)) {
+      footerStoreName = text.replace(/^[\[★■▶◆\*●📍📌🏷️\s]+|[\]★■▶◆\*●\s]+$/g, '').trim();
+    }
+    break; // 제일 마지막 유의미한 줄 하나만 검사
+  }
+
+  let currentGroupStore = footerStoreName || defaultStoreName.trim();
   let isFirstLine = true;
 
   for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
@@ -373,6 +393,19 @@ export function parseSmartOrderText(
         remark: detectedRemark.trim(),
         confidence
       });
+    } else {
+      // 파싱 실패한 줄 처리 (예: "주문건", "샘플건", 다음 줄로 넘어간 비고 등)
+      if (results.length > 0) {
+        const lastItem = results[results.length - 1];
+        // 텍스트 최하단에 있는 상호명(푸터)과 동일한 텍스트면 무시
+        if (rawLine === footerStoreName) continue;
+        
+        // 주문/샘플 관련 키워드가 있거나 길이가 짧은 부가 설명인 경우, 바로 윗 주문의 비고에 자연스럽게 병합
+        if (rawLine.length < 25 || /주문|샘플|교환|미송|반품|신상/i.test(rawLine)) {
+          lastItem.remark = lastItem.remark ? `${lastItem.remark} / ${rawLine}` : rawLine;
+          lastItem.rawText += `\n${rawLine}`;
+        }
+      }
     }
   }
 
