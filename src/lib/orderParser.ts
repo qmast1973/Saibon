@@ -45,19 +45,47 @@ export const MARKET_DICTIONARY: { canonical: string; aliases: string[] }[] = [
  * 텍스트에서 건물명을 탐지하여 표준 명칭으로 변환
  */
 export function matchMarketName(token: string): { canonical: string; matchedAlias: string } | null {
-  // 괄호 안의 내용 제거 (예: "CPH(청평화)" -> "CPH")
-  const clean = token.replace(/\([^)]*\)/g, '').trim().toUpperCase();
-  const rawClean = token.trim().toUpperCase(); // 원래 문자열(괄호 포함) 대문자
-  if (!clean && !rawClean) return null;
+  const trimmed = token.trim();
+  if (!trimmed) return null;
 
-  // 1. 긴 별칭부터 우선 검사 (예: 'APM플레이스'가 'APM'보다 먼저 매칭되도록)
+  // 괄호가 있는 경우 분리 후보군 생성 (예: "CPH(청평화)" -> "CPH(청평화)", "CPH", "청평화")
+  const candidates: string[] = [];
+  candidates.push(trimmed.toUpperCase());
+
+  const parenMatch = trimmed.match(/^([^(]+)\(([^)]+)\)$/);
+  if (parenMatch) {
+    candidates.push(parenMatch[1].trim().toUpperCase());
+    candidates.push(parenMatch[2].trim().toUpperCase());
+  }
+  const withoutParen = trimmed.replace(/\([^)]*\)/g, '').trim().toUpperCase();
+  if (withoutParen && !candidates.includes(withoutParen)) {
+    candidates.push(withoutParen);
+  }
+
+  // 1. 정확 일치 (Exact match) 우선 - 별칭 길이 내림차순
   for (const entry of MARKET_DICTIONARY) {
     const sortedAliases = [...entry.aliases].sort((a, b) => b.length - a.length);
     for (const alias of sortedAliases) {
       const uAlias = alias.toUpperCase();
-      // 정확히 일치하거나, 괄호를 제거한 텍스트가 일치하는 경우
-      if (clean === uAlias || rawClean === uAlias || clean.includes(uAlias)) {
-        return { canonical: entry.canonical, matchedAlias: alias };
+      for (const cand of candidates) {
+        if (cand === uAlias) {
+          return { canonical: entry.canonical, matchedAlias: alias };
+        }
+      }
+    }
+  }
+
+  // 2. 부분 일치: 단, 한 글자 약어('청', '신', '남' 등)는 일반 단어(요청, 신청 등) 오인 방지를 위해 부분 일치 금지!
+  // 최소 2글자 이상 별칭만 candidate.includes(uAlias) 허용
+  for (const entry of MARKET_DICTIONARY) {
+    const sortedAliases = [...entry.aliases].sort((a, b) => b.length - a.length);
+    for (const alias of sortedAliases) {
+      if (alias.length < 2) continue; // 1글자 약어는 완전 일치일 때만 인정
+      const uAlias = alias.toUpperCase();
+      for (const cand of candidates) {
+        if (cand.includes(uAlias)) {
+          return { canonical: entry.canonical, matchedAlias: alias };
+        }
       }
     }
   }
@@ -123,30 +151,33 @@ export function parseSmartOrderText(
     let rawLine = lines[lineIndex].trim();
     if (!rawLine) continue;
 
-    // 템플릿 헤더나 가이드라인, 링크 스킵
+    // 템플릿 헤더나 가이드라인, 링크, 공지/알림톡 머릿글/바닥글 스킵
     if (
       rawLine.includes('상호/건물명/층/호수') || 
       rawLine.startsWith('===') || 
       rawLine.startsWith('---') ||
       rawLine.includes('http://') ||
-      rawLine.includes('https://')
+      rawLine.includes('https://') ||
+      /사입\s*요청서\s*도착/i.test(rawLine) ||
+      /\d+개중\s*\d+번째\s*주문서/i.test(rawLine) ||
+      /문의사항|카카오채널|연락\s*부탁드려요|고객센터|상세\s*주문서\s*확인/i.test(rawLine) ||
+      /이형식도\s*되게|할수있어/i.test(rawLine)
     ) {
       continue;
     }
 
-    // 맨 첫 문장은 무조건 상호로 처리 (슬래시 분할형 등 명백한 예외 제외)
-    if (isFirstLine) {
-      isFirstLine = false;
-      if (!rawLine.includes('/')) {
-        // [상호] 같은 대괄호나 특수기호를 제거하고 상호로 취급
-        const cleanStoreName = rawLine.replace(/^[\[★■▶◆\*●\s]+|[\]★■▶◆\*●\s]+$/g, '').replace(/^(?:소매|상호)\s*[:：]?\s*/, '').trim();
-        currentGroupStore = cleanStoreName;
-        continue;
+    // "XX으로부터 사입 요청서가 도착했습니다" 형태에서 소매 상호 추출
+    const arrivalMatch = rawLine.match(/^([가-힣A-Za-z0-9_\s]{2,25})(?:으로|로)부터\s*사입\s*요청서/);
+    if (arrivalMatch) {
+      const cand = arrivalMatch[1].trim();
+      if (!matchMarketName(cand)) {
+        currentGroupStore = cand;
       }
+      continue;
     }
 
-    // 소매 상호 그룹 헤더 감지 (두번째 줄 이후에 또 명시적으로 [상호] 형태로 입력할 경우를 위해 유지)
-    const storeHeaderMatch = rawLine.match(/^(?:\[|★|■|▶|◆|\*|●?\s*소매\s*[:：]?\s*|상호\s*[:：]?\s*)([가-힣A-Za-z0-9_\s]{2,20})(?:\]|★|■|▶|◆|\*)?$/);
+    // 소매 상호 그룹 헤더 감지 (예: "📍소매명 : 애비뉴261", "● 소매 : 비바글램", "[비바글램]", "상호 : 비바글램")
+    const storeHeaderMatch = rawLine.match(/^(?:[\[★■▶◆\*●📍📌🏷️🏢🏪\s]*)(?:소매명|소매상호|소매점|소매처|소매|상호명|상호|고객사|매장명)\s*[:：]?\s*([가-힣A-Za-z0-9_\s]{2,25})(?:[\]★■▶◆\*]|\s*$)/);
     if (storeHeaderMatch) {
       const candidate = storeHeaderMatch[1].trim();
       // 건물명이 아니라 상호인 경우에만 그룹 상호로 갱신
@@ -156,8 +187,29 @@ export function parseSmartOrderText(
       }
     }
 
-    // 1. 줄 번호 제거 (예: "1. ", "1) ", "① ")
-    let cleanLine = rawLine.replace(/^(\d+[\.\)]|[①-⑳]|[\-\*\•])\s*/, '').trim();
+    // 맨 첫 문장은 명시적 상호이거나 단순 상호명일 때만 상호로 처리 (알림 헤더나 시스템 문구 제외)
+    if (isFirstLine) {
+      isFirstLine = false;
+      if (
+        !rawLine.includes('/') && 
+        !/도착|요청서|주문서|신상마켓|카카오|안내|공지|주문내용/i.test(rawLine)
+      ) {
+        const cleanStoreName = rawLine
+          .replace(/^[\[★■▶◆\*●📍📌🏷️🏢🏪\s]+|[\]★■▶◆\*●\s]+$/g, '')
+          .replace(/^(?:소매명|소매상호|소매점|소매처|소매|상호명|상호|고객사|매장명)\s*[:：]?\s*/, '')
+          .trim();
+        if (cleanStoreName && !matchMarketName(cleanStoreName)) {
+          currentGroupStore = cleanStoreName;
+          continue;
+        }
+      }
+    }
+
+    // 1. 주문내용 접두어 제거 (예: "📍주문내용 : 1. APM / 1층 28 ...")
+    let cleanLine = rawLine.replace(/^(?:[\[★■▶◆\*●📍📌🏷️🏢🏪\s]*)(?:주문내용|주문상세|주문목록|주문서|주문)\s*[:：]?\s*/i, '').trim();
+
+    // 2. 줄 번호 제거 (예: "1. ", "1) ", "① ")
+    cleanLine = cleanLine.replace(/^(\d+[\.\)]|[①-⑳]|[\-\*\•])\s*/, '').trim();
 
     // 2. 슬래시(/)나 쉼표(,)로 명확히 분리된 형식인 경우 우선 처리
     if (cleanLine.includes('/') || (cleanLine.includes(',') && cleanLine.split(',').length >= 3)) {
@@ -308,8 +360,9 @@ export function parseSmartOrderText(
     const hasFloorOrRoom = !!detectedFloor || !!detectedRoom;
     const confidence = (hasMarket && hasFloorOrRoom) ? 'high' : hasMarket ? 'medium' : 'low';
 
-    // 최소한 건물명이나 층/호수 또는 내용이 있는 경우에만 등록
-    if (detectedMarket || detectedFloor || detectedRoom || detectedRemark) {
+    // 슬래시/쉼표 구분이 없는 일반 줄인 경우, 최소한 건물명이 있거나 층+호수가 명확해야 주문으로 인정
+    // (단순 안내 문구, 질문, 잡담이 주문으로 둔갑하는 것 방지)
+    if (detectedMarket || (detectedFloor && detectedRoom)) {
       results.push({
         id: `parsed_${Date.now()}_${lineIndex}_${Math.random().toString(36).substring(2, 6)}`,
         rawText: rawLine,

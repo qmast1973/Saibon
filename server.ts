@@ -17,24 +17,58 @@ function fallbackParseOrders(text: string) {
   ];
 
   for (const line of lines) {
-    // Check for store header like [초코송이마켓] or 상호: 초코송이
-    const storeHeader = line.match(/^\[([^\]]+)\]|^상호\s*[:：]\s*(.+)$|^●?\s*소매\s*[:：]\s*(.+)$/);
-    if (storeHeader) {
-      currentStore = (storeHeader[1] || storeHeader[2] || storeHeader[3] || '').trim();
+    // 템플릿 안내문, 시스템 알림, 링크, 고객센터 바닥글 스킵
+    if (
+      line.includes('상호/건물명/층/호수') || 
+      line.startsWith('===') || 
+      line.startsWith('---') ||
+      line.includes('http://') ||
+      line.includes('https://') ||
+      /사입\s*요청서\s*도착/i.test(line) ||
+      /\d+개중\s*\d+번째\s*주문서/i.test(line) ||
+      /문의사항|카카오채널|연락\s*부탁드려요|고객센터|상세\s*주문서\s*확인/i.test(line) ||
+      /이형식도\s*되게|할수있어/i.test(line)
+    ) {
       continue;
     }
 
+    // "XX으로부터 사입 요청서가 도착했습니다" 형태에서 소매 상호 추출
+    const arrivalMatch = line.match(/^([가-힣A-Za-z0-9_\s]{2,25})(?:으로|로)부터\s*사입\s*요청서/);
+    if (arrivalMatch) {
+      currentStore = arrivalMatch[1].trim();
+      continue;
+    }
+
+    // 소매 상호 헤더 (예: 📍소매명 : 애비뉴261, ● 소매 : 비바글램, [비바글램], 상호: 비바글램)
+    const storeHeader = line.match(/^(?:[\[★■▶◆\*●📍📌🏷️🏢🏪\s]*)(?:소매명|소매상호|소매점|소매처|소매|상호명|상호|고객사|매장명)\s*[:：]?\s*([가-힣A-Za-z0-9_\s]{2,25})(?:[\]★■▶◆\*]|\s*$)/);
+    if (storeHeader) {
+      currentStore = storeHeader[1].trim();
+      continue;
+    }
+
+    // 주문내용 머릿말 및 줄 번호 정제
+    let cleanLine = line.replace(/^(?:[\[★■▶◆\*●📍📌🏷️🏢🏪\s]*)(?:주문내용|주문상세|주문목록|주문서|주문)\s*[:：]?\s*/i, '').trim();
+    cleanLine = cleanLine.replace(/^(\d+[\.\)]|[①-⑳]|[\-\*\•])\s*/, '').trim();
+
     // Slash format
-    if (line.includes('/')) {
-      const parts = line.split('/').map(p => p.trim());
+    if (cleanLine.includes('/')) {
+      const parts = cleanLine.split('/').map(p => p.trim());
       if (parts.length >= 3) {
         // Format B: 1. APM / 2층 18 / 바이보미 / 대납 (Market / Floor Room / Store / Remark)
         if (parts[1].includes('층') || parts[1].match(/^[B\d]/i)) {
-           const marketStr = parts[0].replace(/^\d+\.\s*/, '').replace(/^[A-Za-z0-9]+\(([^)]+)\)$/, '$1').trim(); // e.g., "CPH(청평화)" -> "청평화"
+           let marketStr = parts[0].replace(/^\d+\.\s*/, '').trim();
+           // e.g., "CPH(청평화)" -> "청평화"
+           const parenM = marketStr.match(/^([^(]+)\(([^)]+)\)$/);
+           if (parenM) {
+             marketStr = parenM[2].trim();
+           }
            
            const floorMatch = parts[1].match(/^([^층\s]+층|지하\s*\d+층|B\d+층?)\s*(.*)/i);
            const floor = floorMatch ? floorMatch[1] : parts[1].split(' ')[0];
-           const room = floorMatch ? floorMatch[2] : parts[1].split(' ').slice(1).join(' ');
+           let room = floorMatch ? floorMatch[2] : parts[1].split(' ').slice(1).join(' ');
+           if (room && !room.endsWith('호') && /^\d+$/.test(room)) {
+             room = `${room}호`;
+           }
            
            const wholesaleStore = parts[2] || '';
            const remark = parts.slice(3).join(' ') || '';
@@ -50,11 +84,15 @@ function fallbackParseOrders(text: string) {
         } else {
           // Format A: Store / Market / Floor / Room / Remark
           const wholesaleStore = parts[0] || '';
+          let room = parts[3] || '';
+          if (room && !room.endsWith('호') && /^\d+$/.test(room)) {
+            room = `${room}호`;
+          }
           results.push({
             store: currentStore || '상호 미지정',
             market: parts[1] || '',
             floor: parts[2] || '',
-            room: (parts[3] || '') + (wholesaleStore ? ` (${wholesaleStore})` : ''),
+            room: room + (wholesaleStore ? ` (${wholesaleStore})` : ''),
             remark: parts.slice(4).join(' ') || ''
           });
           continue;
@@ -65,21 +103,22 @@ function fallbackParseOrders(text: string) {
     // Keyword detection
     let matchedMarket = '';
     for (const km of knownMarkets) {
-      if (line.includes(km)) {
+      if (cleanLine.includes(km)) {
         matchedMarket = km;
         break;
       }
     }
 
-    const floorMatch = line.match(/(-?\d+층|지하\s*\d+층|B\d+층?)/i);
-    let working = line;
+    const floorMatch = cleanLine.match(/(-?\d+층|지하\s*\d+층|B\d+층?)/i);
+    let working = cleanLine;
     if (matchedMarket) working = working.replace(matchedMarket, ' ');
     if (floorMatch) working = working.replace(floorMatch[0], ' ');
 
     const roomMatch = working.match(/([가-힣A-Za-z0-9\s-]{1,10}호|[가-힣]\s*동\s*\d+호?)/);
     if (roomMatch) working = working.replace(roomMatch[0], ' ');
     
-    if (matchedMarket || floorMatch || roomMatch) {
+    // 단순 안내문구나 잡담이 아닌 건물명이 있거나 층/호수가 명확한 경우에만 주문으로 등록
+    if (matchedMarket || (floorMatch && roomMatch)) {
       results.push({
         store: currentStore || '상호 미지정',
         market: matchedMarket || '건물 미지정',
@@ -141,15 +180,23 @@ Text:
 ${text}
 """
 
-The text may include retail store names (e.g., "● 소매 : 비바글램") and numbered lists.
-A common format is: "[Index]. [Market] / [Floor] [Room] / [Wholesale Store] / [Remark]" (e.g., "1. APM / 2층 18 / 바이보미 / 대납").
-Another format: "[Wholesale Store] / [Market] / [Floor] / [Room] / [Remark]".
-Each order usually contains: market name, floor, room/store number, store name, and any notes/amounts.
-Set the status as '미완료' (uncompleted) and record type as '대납' if it mentions payment, or parse accordingly.
+The text may include:
+- Sinsang Market requests (신상마켓 사입 요청서):
+  e.g.,
+  "📍소매명 : 애비뉴261" or "애비뉴261으로부터 사입 요청서가 도착했습니다." -> The retail store (소매상호) is "애비뉴261".
+  "📍주문내용 : 1. APM / 1층 28 / 레이크(LAKE) / 대납"
+  "2. CPH(청평화) / 지하1층 라23 / 제이런 (J-run, Jrun) / 대납"
+  "3. 제일평화 / 5층 124 / 플라스틱 / 대납"
+- Retail store names (소매상호) marked with "● 소매 : ...", "📍소매명 : ...", "[상호]", etc.
+- Ignore all notification headers (e.g., "📩 신상마켓 사입 요청서 도착", "1개중 1번째 주문서입니다.") and contact footers (e.g., "☎️ 관련해서 문의사항...").
+- Ignore user conversational queries or notes at the end (e.g., "이형식도 되게 할수있어?").
+- A common order format is: "[Index]. [Market] / [Floor] [Room] / [Wholesale Store] / [Remark]" (e.g., "1. APM / 2층 18 / 바이보미 / 대납", "1. APM / 1층 28 / 레이크(LAKE) / 대납").
+- Another format: "[Wholesale Store] / [Market] / [Floor] / [Room] / [Remark]".
 
 IMPORTANT RULES FOR "store" and "room" FIELDS:
-- The "store" field MUST contain the RETAIL STORE name (소매상호, e.g., "비바글램"). If it is not explicitly declared, use "상호 미지정".
-- The "room" field MUST contain the room number PLUS the WHOLESALE STORE name (도매상호) in parenthesis if available. E.g., "18호 (바이보미)".
+- The "store" field MUST contain the RETAIL STORE name (소매상호, e.g., "애비뉴261", "비바글램"). If it is not explicitly declared, use "상호 미지정".
+- The "room" field MUST contain the room number PLUS the WHOLESALE STORE name (도매상호) in parenthesis if available. E.g., "28호 (레이크(LAKE))", "라23 (제이런 (J-run, Jrun))", "18호 (바이보미)".
+- Set the status as '미완료' (uncompleted) and record type as '대납' if it mentions payment, or parse accordingly.
 Make sure to parse market, floor, room precisely.`;
 
     const schemaConfig = {
