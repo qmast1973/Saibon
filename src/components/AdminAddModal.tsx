@@ -143,13 +143,13 @@ export const AdminAddModal: React.FC<AdminAddModalProps> = ({
 
   return (
     <div id="loginAdminAddModal" className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-5 border border-slate-200 my-auto">
+      <div className="w-full max-w-md bg-gray-900 rounded-2xl shadow-2xl p-5 border border-gray-800 my-auto">
         <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-indigo-600" />
-            <h3 className="font-bold text-base text-slate-800">관리자 추가</h3>
+            <h3 className="font-bold text-base text-gray-100">관리자 추가</h3>
           </div>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1">
+          <button type="button" onClick={onClose} className="text-gray-500 hover:text-gray-300 p-1">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -178,8 +178,8 @@ export const AdminAddModal: React.FC<AdminAddModalProps> = ({
 
         <form onSubmit={handleSubmit} className="space-y-3">
           {hasExistingAdmin && !isAlreadyLoggedInAdmin && (
-            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
-              <div className="text-xs font-bold text-slate-700">기존 관리자 인증</div>
+            <div className="bg-gray-900 p-3 rounded-xl border border-gray-800 space-y-2">
+              <div className="text-xs font-bold text-gray-200">기존 관리자 인증</div>
               <input
                 type="text"
                 required
@@ -187,7 +187,7 @@ export const AdminAddModal: React.FC<AdminAddModalProps> = ({
                 value={authId}
                 onChange={(e) => setAuthId(e.target.value.replace(/[^a-zA-Z0-9]/g, ''))}
                 placeholder="기존 관리자 아이디"
-                className="w-full border border-slate-300 rounded-lg p-2.5 text-xs bg-white outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full border border-gray-700 rounded-lg p-2.5 text-xs bg-gray-900 outline-none focus:ring-2 focus:ring-indigo-500"
               />
               <div className="relative">
                 <input
@@ -197,12 +197,12 @@ export const AdminAddModal: React.FC<AdminAddModalProps> = ({
                   value={authPw}
                   onChange={(e) => setAuthPw(e.target.value.replace(/[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/g, ''))}
                   placeholder="기존 관리자 비밀번호"
-                  className="w-full border border-slate-300 rounded-lg p-2.5 pr-10 text-xs bg-white outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full border border-gray-700 rounded-lg p-2.5 pr-10 text-xs bg-gray-900 outline-none focus:ring-2 focus:ring-indigo-500"
                 />
                 <button
                   type="button"
                   onClick={() => setShowAuthPw(!showAuthPw)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
                   tabIndex={-1}
                 >
                   {showAuthPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -212,28 +212,28 @@ export const AdminAddModal: React.FC<AdminAddModalProps> = ({
           )}
 
           <div className="space-y-2.5">
-            <div className="text-xs font-bold text-slate-700">새 관리자 정보</div>
+            <div className="text-xs font-bold text-gray-200">새 관리자 정보</div>
             <input
               type="text"
               required
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="새 관리자 이름 (예: 박승진)"
-              className="w-full border border-slate-300 rounded-lg p-2.5 text-xs bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
+              className="w-full border border-gray-700 rounded-lg p-2.5 text-xs bg-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-gray-900"
             />
             <input
               type="email"
               value={newEmail}
               onChange={(e) => setNewEmail(e.target.value)}
               placeholder="이메일 주소 (선택: admin@example.com)"
-              className="w-full border border-slate-300 rounded-lg p-2.5 text-xs bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
+              className="w-full border border-gray-700 rounded-lg p-2.5 text-xs bg-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-gray-900"
             />
             <input
               type="tel"
               value={newPhone}
               onChange={(e) => setNewPhone(e.target.value)}
               placeholder="전화번호 (예: 010-0000-0000)"
-              className="w-full border border-slate-300 rounded-lg p-2.5 text-xs bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
+              className="w-full border border-gray-700 rounded-lg p-2.5 text-xs bg-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-gray-900"
             />
             <input
               type="text"
@@ -243,7 +243,7 @@ export const AdminAddModal: React.FC<AdminAddModalProps> = ({
               value={newId}
               onChange={(e) => setNewId(e.target.value.replace(/[^a-zA-Z0-9]/g, ''))}
               placeholder="새 관리자 아이디 (영문/숫자 4자 이상)"
-              className="w-full border border-slate-300 rounded-lg p-2.5 text-xs bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
+              className="w-full border border-gray-700 rounded-lg p-2.5 text-xs bg-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-gray-900"
             />
             <div className="relative">
               <input
@@ -254,12 +254,12 @@ export const AdminAddModal: React.FC<AdminAddModalProps> = ({
                 value={newPw}
                 onChange={(e) => setNewPw(e.target.value.replace(/[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/g, ''))}
                 placeholder="새 관리자 비밀번호 (6자 이상)"
-                className="w-full border border-slate-300 rounded-lg p-2.5 pr-10 text-xs bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
+                className="w-full border border-gray-700 rounded-lg p-2.5 pr-10 text-xs bg-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-gray-900"
               />
               <button
                 type="button"
                 onClick={() => setShowNewPw(!showNewPw)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
                 tabIndex={-1}
               >
                 {showNewPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -275,12 +275,12 @@ export const AdminAddModal: React.FC<AdminAddModalProps> = ({
                 value={newPw2}
                 onChange={(e) => setNewPw2(e.target.value.replace(/[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/g, ''))}
                 placeholder="새 관리자 비밀번호 확인"
-                className="w-full border border-slate-300 rounded-lg p-2.5 pr-10 text-xs bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
+                className="w-full border border-gray-700 rounded-lg p-2.5 pr-10 text-xs bg-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-gray-900"
               />
               <button
                 type="button"
                 onClick={() => setShowNewPw2(!showNewPw2)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
                 tabIndex={-1}
               >
                 {showNewPw2 ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -303,7 +303,7 @@ export const AdminAddModal: React.FC<AdminAddModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 border border-slate-300 rounded-xl py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
+              className="flex-1 border border-gray-700 rounded-xl py-2.5 text-xs font-semibold text-gray-300 hover:bg-gray-900 transition"
             >
               취소
             </button>

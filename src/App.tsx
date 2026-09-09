@@ -322,7 +322,7 @@ export default function App() {
       }
 
       if (currentUser?.role === 'buyer') {
-        if (allowedMarkets && allowedMarkets.size > 0 && !allowedMarkets.has(t.market)) {
+        if (!allowedMarkets || !allowedMarkets.has(normalizeMarketName(t.market))) {
           return false;
         }
       }
@@ -734,10 +734,10 @@ export default function App() {
 
   if (isInitializing) {
     return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
         <div className="text-center space-y-2">
           <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-xs text-slate-500 font-semibold">사입ON 데이터를 불러오는 중...</p>
+          <p className="text-xs text-gray-400 font-semibold">사입ON 데이터를 불러오는 중...</p>
     </div>
     </div>
     );
@@ -768,7 +768,7 @@ export default function App() {
   }
 
   return (
-    <div className="bg-slate-100 text-slate-800 min-h-screen flex flex-col antialiased">
+    <div className="bg-gray-950 text-gray-100 min-h-screen flex flex-col antialiased">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[99999] bg-green-500 text-white px-4 py-3 rounded-full shadow-2xl font-bold flex items-center gap-2 animate-bounce border-2 border-white/20 whitespace-nowrap">
@@ -808,23 +808,23 @@ export default function App() {
       {/* Main Content Area */}
       <main className="max-w-7xl w-full mx-auto p-3 flex-1 flex flex-col gap-3">
         {/* Search Bar */}
-        <section className="bg-white p-2 sm:p-2.5 rounded-2xl shadow-xs border border-slate-200 flex items-center justify-between gap-2.5 text-xs">
+        <section className="bg-gray-900 p-2 sm:p-2.5 rounded-2xl shadow-xs border border-gray-800 flex items-center justify-between gap-2.5 text-xs">
           <div className="relative flex-1 max-w-md">
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="상호, 건물, 비고, 담당자 검색..."
-              className="border border-slate-300 rounded-xl pl-8 pr-3 py-1.5 bg-slate-50 w-full outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white text-xs"
+              className="border border-gray-700 rounded-xl pl-8 pr-3 py-1.5 bg-gray-900 w-full outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-gray-900 text-xs"
             />
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
+            <Search className="w-3.5 h-3.5 text-gray-500 absolute left-2.5 top-2" />
     </div>
 
           {searchQuery && (
             <button
               type="button"
               onClick={() => setSearchQuery('')}
-              className="text-slate-500 hover:text-indigo-600 font-semibold text-xs px-2 py-1 rounded-lg hover:bg-slate-100 transition shrink-0"
+              className="text-gray-400 hover:text-indigo-600 font-semibold text-xs px-2 py-1 rounded-lg hover:bg-gray-950 transition shrink-0"
             >
               검색 초기화
             </button>
@@ -959,7 +959,7 @@ export default function App() {
             setShowAiModal(true);
           }}
           stores={stores}
-          allMarkets={allMarkets}
+          allMarkets={currentUser?.role === 'buyer' && !currentUser.isBuyerAdmin ? (currentUser.allowedMarkets || []).map(normalizeMarketName) : allMarkets}
           onClose={() => {
             setShowOrderModal(false);
             setEditingTransaction(null);

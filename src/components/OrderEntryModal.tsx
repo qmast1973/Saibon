@@ -175,7 +175,7 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
 
   return (
     <div id="entryModal" className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[92vh] overflow-hidden border border-slate-200 flex flex-col my-auto">
+      <div className="bg-gray-900 rounded-2xl shadow-2xl w-full max-w-xl max-h-[92vh] overflow-hidden border border-gray-800 flex flex-col my-auto">
         
         {/* Header */}
         <div className="bg-indigo-900 text-white px-5 py-4 flex items-center justify-between shrink-0">
@@ -205,18 +205,18 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
           {/* Top Row: Date & Store */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">날짜 *</label>
+              <label className="block font-semibold text-gray-200 mb-1">날짜 *</label>
               <input
                 type="date"
                 required
                 value={date}
                 disabled={isRegularBuyer && isEditMode}
                 onChange={(e) => setDate(e.target.value)}
-                className={`w-full border border-slate-300 rounded-xl p-2.5 bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none ${(isRegularBuyer && isEditMode) ? 'bg-slate-100 cursor-not-allowed' : 'focus:bg-white'}`}
+                className={`w-full border border-gray-700 rounded-xl p-2.5 bg-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none ${(isRegularBuyer && isEditMode) ? 'bg-gray-950 cursor-not-allowed' : 'focus:bg-gray-900'}`}
               />
             </div>
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">상호 (소매점) *</label>
+              <label className="block font-semibold text-gray-200 mb-1">상호 (소매점) *</label>
               <input
                 type="text"
                 required
@@ -225,7 +225,7 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
                 disabled={(isRegularBuyer && isEditMode) || (isMerchant && !!currentUser?.storeName)}
                 onChange={(e) => setStore(e.target.value)}
                 placeholder="상호명을 입력하세요"
-                className={`w-full border border-slate-300 rounded-xl p-2.5 bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none ${((isRegularBuyer && isEditMode) || (isMerchant && !!currentUser?.storeName)) ? 'bg-slate-100 cursor-not-allowed' : 'focus:bg-white'}`}
+                className={`w-full border border-gray-700 rounded-xl p-2.5 bg-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none ${((isRegularBuyer && isEditMode) || (isMerchant && !!currentUser?.storeName)) ? 'bg-gray-950 cursor-not-allowed' : 'focus:bg-gray-900'}`}
               />
               <datalist id="storeDatalist">
                 {stores.map(s => <option key={s} value={s} />)}
@@ -237,7 +237,7 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
 
           {/* Multi-row Order Entry */}
           <div>
-            <div className="grid grid-cols-[1.4fr_.7fr_.7fr_auto] gap-2 mb-1.5 text-[11px] font-bold text-slate-600">
+            <div className="grid grid-cols-[1.4fr_.7fr_.7fr_auto] gap-2 mb-1.5 text-[11px] font-bold text-gray-300">
               <div>건물명/시장 *</div>
               <div>층 *</div>
               <div>호수 *</div>
@@ -255,7 +255,7 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
                     onChange={(e) => handleRowChange(index, 'market', e.target.value)}
                     onBlur={(e) => handleRowChange(index, 'market', normalizeMarketName(e.target.value))}
                     placeholder="예: 디오트, APM, 청평"
-                    className={`w-full border border-slate-300 rounded-xl p-2.5 text-xs bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none ${(isRegularBuyer && isEditMode) ? 'bg-slate-100 cursor-not-allowed' : 'focus:bg-white'}`}
+                    className={`w-full border border-gray-700 rounded-xl p-2.5 text-xs bg-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none ${(isRegularBuyer && isEditMode) ? 'bg-gray-950 cursor-not-allowed' : 'focus:bg-gray-900'}`}
                   />
                   <input
                     type="text"
@@ -263,7 +263,7 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
                     disabled={isRegularBuyer && isEditMode}
                     onChange={(e) => handleRowChange(index, 'floor', e.target.value)}
                     placeholder="예: 3, 지1"
-                    className={`w-full border border-slate-300 rounded-xl p-2.5 text-xs bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none ${(isRegularBuyer && isEditMode) ? 'bg-slate-100 cursor-not-allowed' : 'focus:bg-white'}`}
+                    className={`w-full border border-gray-700 rounded-xl p-2.5 text-xs bg-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none ${(isRegularBuyer && isEditMode) ? 'bg-gray-950 cursor-not-allowed' : 'focus:bg-gray-900'}`}
                   />
                   <input
                     type="text"
@@ -271,7 +271,7 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
                     disabled={isRegularBuyer && isEditMode}
                     onChange={(e) => handleRowChange(index, 'room', e.target.value)}
                     placeholder="예: 25호"
-                    className={`w-full border border-slate-300 rounded-xl p-2.5 text-xs bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none ${(isRegularBuyer && isEditMode) ? 'bg-slate-100 cursor-not-allowed' : 'focus:bg-white'}`}
+                    className={`w-full border border-gray-700 rounded-xl p-2.5 text-xs bg-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none ${(isRegularBuyer && isEditMode) ? 'bg-gray-950 cursor-not-allowed' : 'focus:bg-gray-900'}`}
                   />
                   {!isEditMode && orderRows.length > 1 && (
                     <button
@@ -312,23 +312,23 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
           </div>
 
           {/* Order Summary Box */}
-          <div className="border border-slate-200 rounded-xl bg-slate-50 p-3">
+          <div className="border border-gray-800 rounded-xl bg-gray-900 p-3">
             <div className="flex items-center justify-between mb-1.5">
-              <span className="font-bold text-slate-700">입력된 주문 내역</span>
+              <span className="font-bold text-gray-200">입력된 주문 내역</span>
               <span className="text-indigo-600 font-bold">{validRows.length}건</span>
             </div>
-            <div className="max-h-28 overflow-y-auto space-y-1 text-[11px] text-slate-600">
+            <div className="max-h-28 overflow-y-auto space-y-1 text-[11px] text-gray-300">
               {validRows.length > 0 ? (
                 validRows.map((r, i) => (
-                  <div key={i} className="flex items-center gap-2 py-0.5 border-b border-slate-200 last:border-b-0">
-                    <span className="font-bold text-slate-400 w-4">{i + 1}.</span>
-                    <span className="font-semibold text-slate-800">{r.market || '-'}</span>
+                  <div key={i} className="flex items-center gap-2 py-0.5 border-b border-gray-800 last:border-b-0">
+                    <span className="font-bold text-gray-500 w-4">{i + 1}.</span>
+                    <span className="font-semibold text-gray-100">{r.market || '-'}</span>
                     <span>{String(r.floor || '').replace(/층$/, '') ? `${String(r.floor || '').replace(/층$/, '')}층` : ''}</span>
                     <span>{r.room ? `${r.room}` : ''}</span>
                   </div>
                 ))
               ) : (
-                <div className="text-slate-400 text-center py-2">건물명, 층, 호수를 입력하면 여기에 요약됩니다.</div>
+                <div className="text-gray-500 text-center py-2">건물명, 층, 호수를 입력하면 여기에 요약됩니다.</div>
               )}
             </div>
           </div>
@@ -337,18 +337,18 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
 
           {/* Remark / Memo */}
           <div>
-            <label className="block font-semibold text-slate-700 mb-1">비고 (메모)</label>
+            <label className="block font-semibold text-gray-200 mb-1">비고 (메모)</label>
             <textarea
               rows={2}
               value={remark}
               onChange={(e) => setRemark(e.target.value)}
               placeholder="특이사항, 요청사항 메모 등"
-              className="w-full border border-slate-300 rounded-xl p-2.5 text-xs bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none focus:bg-white resize-none"
+              className="w-full border border-gray-700 rounded-xl p-2.5 text-xs bg-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none focus:bg-gray-900 resize-none"
             />
           </div>
 
           {/* Footer Actions */}
-          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-800">
             {isEditMode && isBuyer && (
               <button
                 type="button"
@@ -362,7 +362,7 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition"
+              className="px-4 py-2.5 rounded-xl bg-gray-950 hover:bg-slate-200 text-gray-200 font-semibold transition"
             >
               취소
             </button>

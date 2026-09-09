@@ -135,13 +135,13 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-100">데이터 관리 및 초기화</h2>
-              <p className="text-xs text-slate-400">실사용 전환을 위한 데이터 비우기 및 테스트 데이터 관리</p>
+              <p className="text-xs text-gray-500">실사용 전환을 위한 데이터 비우기 및 테스트 데이터 관리</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-800 transition"
+            className="text-gray-500 hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-800 transition"
           >
             <X className="w-5 h-5" />
           </button>
@@ -252,7 +252,7 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
               </div>
               <div className="flex-1">
                 <h3 className="text-sm font-bold text-amber-200">중복 데이터 자동 병합 (오류 복구용)</h3>
-                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                <p className="text-xs text-gray-500 mt-1 leading-relaxed">
                   엑셀 여러번 업로드 등으로 <strong>완전히 똑같은 주문이 중복 생성된 경우</strong>, 1개만 남기고 나머지를 자동 삭제합니다. <br/>
                   <span className="text-amber-500 font-bold">*일부러 동일하게 2건 입력한 내역도 합쳐지므로 주의하세요.</span>
                 </p>
@@ -276,7 +276,7 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
               </div>
               <div className="flex-1">
                 <h3 className="text-sm font-bold text-slate-200">수금 기록만 초기화</h3>
-                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                <p className="text-xs text-gray-500 mt-1 leading-relaxed">
                   사입 장부는 그대로 유지하고, 수금 관리 화면의 입금/수금 체크 기록만 초기화합니다.
                 </p>
               </div>

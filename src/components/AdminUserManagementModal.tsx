@@ -136,7 +136,7 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[250] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="w-full max-w-2xl bg-gray-900 rounded-2xl shadow-2xl border border-gray-800 overflow-hidden flex flex-col max-h-[90vh]">
         {/* Custom Alert/Confirm */}
         {alertMsg && (
           <div className="mx-4 mt-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg flex items-center justify-between">
@@ -150,7 +150,7 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
               {userToDelete.name || userToDelete.username} ({userToDelete.role}) 계정을 정말 삭제하시겠습니까?
             </div>
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setUserToDelete(null)} className="px-3 py-1.5 bg-white border border-rose-200 text-rose-600 text-xs font-bold rounded-md hover:bg-rose-50">
+              <button onClick={() => setUserToDelete(null)} className="px-3 py-1.5 bg-gray-900 border border-rose-200 text-rose-600 text-xs font-bold rounded-md hover:bg-rose-50">
                 취소
               </button>
               <button onClick={confirmDelete} className="px-3 py-1.5 bg-rose-600 text-white text-xs font-bold rounded-md hover:bg-rose-700">
@@ -176,8 +176,8 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
         </div>
 
         {/* Toolbar */}
-        <div className="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2 shrink-0 flex-wrap">
-          <div className="text-xs text-slate-600 font-semibold">
+        <div className="p-3 bg-gray-900 border-b border-gray-800 flex items-center justify-between gap-2 shrink-0 flex-wrap">
+          <div className="text-xs text-gray-300 font-semibold">
             총 등록 회원: <span className="text-indigo-600 font-bold">{visibleUsers.length}명</span>
           </div>
           <div className="flex items-center gap-2">
@@ -203,27 +203,27 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
             const Icon = cat.icon;
 
             return (
-              <div key={cat.role} className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-xs">
+              <div key={cat.role} className="border border-gray-800 rounded-xl overflow-hidden bg-gray-900 shadow-xs">
                 <div className={`px-4 py-2.5 flex items-center justify-between font-bold text-xs ${cat.bg} border-b`}>
                   <div className="flex items-center gap-2">
                     <Icon className={`w-4 h-4 ${cat.color}`} />
                     <span className={cat.color}>{cat.title}</span>
                   </div>
-                  <span className="text-[11px] text-slate-500 font-semibold">{groupUsers.length}명</span>
+                  <span className="text-[11px] text-gray-400 font-semibold">{groupUsers.length}명</span>
                 </div>
 
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-gray-800">
                   {groupUsers.map(user => (
-                    <div key={user.username} className="p-3 hover:bg-slate-50 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                    <div key={user.username} className="p-3 hover:bg-gray-900 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-slate-900">{user.name || '-'}</span>
+                          <span className="font-bold text-gray-100">{user.name || '-'}</span>
                           {user.storeName && (
                             <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md font-semibold border border-emerald-200">
                               {user.storeName}
                             </span>
                           )}
-                          <span className="text-slate-400 font-mono text-[11px]">({user.username})</span>
+                          <span className="text-gray-500 font-mono text-[11px]">({user.username})</span>
                           <span
                             className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                               user.approved
@@ -235,10 +235,10 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
                           </span>
                         </div>
 
-                        <div className="text-[11px] text-slate-500 mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                        <div className="text-[11px] text-gray-400 mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
                           {user.email && (
-                            <span className="text-slate-600 flex items-center gap-1">
-                              <Mail className="w-3 h-3 text-slate-400" />
+                            <span className="text-gray-300 flex items-center gap-1">
+                              <Mail className="w-3 h-3 text-gray-500" />
                               {user.email}
                             </span>
                           )}
@@ -277,7 +277,7 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
                             className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${
                               user.isBuyerAdmin
                                 ? 'bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300'
-                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'
+                                : 'bg-gray-950 hover:bg-slate-200 text-gray-200 border border-gray-700'
                             }`}
                           >
                             <Shield className="w-3 h-3" />
@@ -290,7 +290,7 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
                             onClick={() => handleToggleApproval(user)}
                             className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${
                               user.approved
-                                ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'
+                                ? 'bg-gray-950 hover:bg-slate-200 text-gray-200 border border-gray-700'
                                 : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs'
                             }`}
                           >
@@ -328,7 +328,7 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
         </div>
 
         {/* Footer */}
-        <div className="p-3 bg-slate-50 border-t border-slate-200 flex justify-end shrink-0">
+        <div className="p-3 bg-gray-900 border-t border-gray-800 flex justify-end shrink-0">
           <button
             type="button"
             onClick={onClose}

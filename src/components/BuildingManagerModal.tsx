@@ -64,7 +64,7 @@ export const BuildingManagerModal: React.FC<BuildingManagerModalProps> = ({ onCl
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-center justify-center p-3 sm:p-4 animate-fadeIn">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden border border-slate-200 flex flex-col max-h-[85vh]">
+      <div className="bg-gray-900 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden border border-gray-800 flex flex-col max-h-[85vh]">
         <div className="bg-indigo-900 text-white px-5 py-4 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
             <Building className="w-5 h-5 text-indigo-300" />
@@ -75,7 +75,7 @@ export const BuildingManagerModal: React.FC<BuildingManagerModalProps> = ({ onCl
           </button>
         </div>
 
-        <div className="p-5 flex-1 overflow-y-auto flex flex-col min-h-0 bg-slate-50">
+        <div className="p-5 flex-1 overflow-y-auto flex flex-col min-h-0 bg-gray-900">
           {error && (
             <div className="mb-4 p-3 bg-red-50 text-red-700 text-xs rounded-xl border border-red-200">
               {error}
@@ -89,7 +89,7 @@ export const BuildingManagerModal: React.FC<BuildingManagerModalProps> = ({ onCl
               onChange={(e) => setNewMarket(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); }}
               placeholder="새 건물명 입력"
-              className="flex-1 border border-slate-300 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
+              className="flex-1 border border-gray-700 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-gray-900"
             />
             <button
               type="button"
@@ -102,17 +102,17 @@ export const BuildingManagerModal: React.FC<BuildingManagerModalProps> = ({ onCl
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto border border-slate-200 rounded-xl bg-white shadow-inner p-2 space-y-1">
+          <div className="flex-1 overflow-y-auto border border-gray-800 rounded-xl bg-gray-900 shadow-inner p-2 space-y-1">
             {loading ? (
-              <div className="h-20 flex items-center justify-center text-slate-400">
+              <div className="h-20 flex items-center justify-center text-gray-500">
                 <Loader2 className="w-5 h-5 animate-spin" />
               </div>
             ) : markets.length === 0 ? (
-              <div className="py-6 text-center text-slate-400 text-xs">등록된 건물이 없습니다.</div>
+              <div className="py-6 text-center text-gray-500 text-xs">등록된 건물이 없습니다.</div>
             ) : (
               markets.map(m => (
-                <div key={m} className="flex items-center justify-between px-3 py-2 hover:bg-slate-50 rounded-lg group transition">
-                  <span className="text-sm font-medium text-slate-700">{m}</span>
+                <div key={m} className="flex items-center justify-between px-3 py-2 hover:bg-gray-900 rounded-lg group transition">
+                  <span className="text-sm font-medium text-gray-200">{m}</span>
                   <button
                     type="button"
                     onClick={() => handleDelete(m)}
@@ -126,11 +126,11 @@ export const BuildingManagerModal: React.FC<BuildingManagerModalProps> = ({ onCl
           </div>
         </div>
 
-        <div className="bg-white border-t border-slate-100 px-5 py-3 flex justify-end gap-2 shrink-0">
+        <div className="bg-gray-900 border-t border-slate-100 px-5 py-3 flex justify-end gap-2 shrink-0">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold transition"
+            className="px-4 py-2.5 rounded-xl bg-gray-950 hover:bg-slate-200 text-gray-200 text-sm font-semibold transition"
           >
             취소
           </button>

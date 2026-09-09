@@ -185,7 +185,7 @@ export const ExcelImportWizard: React.FC<ExcelImportWizardProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[320] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-200 my-auto flex flex-col max-h-[90vh]">
+      <div className="bg-gray-900 rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-gray-800 my-auto flex flex-col max-h-[90vh]">
         
         {/* Step 1: Receivable Selection */}
         {currentStep === 1 && (
@@ -221,16 +221,16 @@ export const ExcelImportWizard: React.FC<ExcelImportWizardProps> = ({
                   <button
                     type="button"
                     onClick={() => handleSelectAllReceivables(false)}
-                    className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-bold border border-slate-200"
+                    className="px-2.5 py-1 rounded-lg bg-gray-950 text-gray-200 font-bold border border-gray-800"
                   >
                     전체 해제
                   </button>
                 </div>
               </div>
 
-              <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 max-h-72 overflow-y-auto">
+              <div className="border border-gray-800 rounded-xl divide-y divide-gray-800 max-h-72 overflow-y-auto">
                 {receivableDates.length === 0 ? (
-                  <div className="p-8 text-center text-slate-400">엑셀에 미수금 내역이 없습니다. 다음으로 진행하세요.</div>
+                  <div className="p-8 text-center text-gray-500">엑셀에 미수금 내역이 없습니다. 다음으로 진행하세요.</div>
                 ) : (
                   receivableDates.map(date => {
                     const count = receivableDateMap.get(date)?.length || 0;
@@ -244,7 +244,7 @@ export const ExcelImportWizard: React.FC<ExcelImportWizardProps> = ({
                             onChange={() => handleReceivableToggle(date)}
                             className="w-4 h-4 text-amber-600 rounded"
                           />
-                          <span className="font-bold text-slate-900">{date}</span>
+                          <span className="font-bold text-gray-100">{date}</span>
                         </div>
                         <span className="font-semibold text-amber-700">{count}건</span>
                       </label>
@@ -254,7 +254,7 @@ export const ExcelImportWizard: React.FC<ExcelImportWizardProps> = ({
               </div>
             </div>
 
-            <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-between shrink-0">
+            <div className="p-4 bg-gray-900 border-t border-gray-800 flex justify-between shrink-0">
               <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl bg-slate-200 font-semibold text-xs">
                 취소
               </button>
@@ -303,14 +303,14 @@ export const ExcelImportWizard: React.FC<ExcelImportWizardProps> = ({
                   <button
                     type="button"
                     onClick={() => handleSelectAllNormalDates(false)}
-                    className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-bold border border-slate-200"
+                    className="px-2.5 py-1 rounded-lg bg-gray-950 text-gray-200 font-bold border border-gray-800"
                   >
                     전체 해제
                   </button>
                 </div>
               </div>
 
-              <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 max-h-72 overflow-y-auto">
+              <div className="border border-gray-800 rounded-xl divide-y divide-gray-800 max-h-72 overflow-y-auto">
                 {normalDates.map(date => {
                   const count = normalDateMap.get(date)?.length || 0;
                   const isChecked = selectedNormalDates.has(date);
@@ -323,7 +323,7 @@ export const ExcelImportWizard: React.FC<ExcelImportWizardProps> = ({
                           onChange={() => handleNormalDateToggle(date)}
                           className="w-4 h-4 text-emerald-600 rounded"
                         />
-                        <span className="font-bold text-slate-900">{date}</span>
+                        <span className="font-bold text-gray-100">{date}</span>
                       </div>
                       <span className="font-semibold text-emerald-700">{count}건</span>
                     </label>
@@ -332,7 +332,7 @@ export const ExcelImportWizard: React.FC<ExcelImportWizardProps> = ({
               </div>
             </div>
 
-            <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-between shrink-0">
+            <div className="p-4 bg-gray-900 border-t border-gray-800 flex justify-between shrink-0">
               <button type="button" onClick={() => setCurrentStep(1)} className="px-4 py-2 rounded-xl bg-slate-200 font-semibold text-xs">
                 이전
               </button>
@@ -366,8 +366,8 @@ export const ExcelImportWizard: React.FC<ExcelImportWizardProps> = ({
             </div>
 
             <div className="p-5 space-y-4 overflow-y-auto flex-1 text-xs">
-              <div className="border border-slate-200 rounded-xl p-4 bg-slate-50 text-center">
-                <div className="text-slate-500 text-[11px] mb-1">엑셀 담당자명</div>
+              <div className="border border-gray-800 rounded-xl p-4 bg-gray-900 text-center">
+                <div className="text-gray-400 text-[11px] mb-1">엑셀 담당자명</div>
                 <div className="text-xl font-bold text-indigo-900">{currentManagerName}</div>
                 {existingUser && (
                   <div className="text-[11px] text-emerald-600 font-semibold mt-1">
@@ -377,7 +377,7 @@ export const ExcelImportWizard: React.FC<ExcelImportWizardProps> = ({
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-2">담당 역할을 선택하세요</label>
+                <label className="font-bold text-gray-200 block mb-2">담당 역할을 선택하세요</label>
                 <div className="grid grid-cols-2 gap-2">
                   {[
                     { role: 'buyer', label: '🧑‍💼 서울 사입삼촌' },
@@ -394,7 +394,7 @@ export const ExcelImportWizard: React.FC<ExcelImportWizardProps> = ({
                         className={`p-3 rounded-xl border text-left font-bold transition flex items-center justify-between ${
                           isSelected
                             ? 'bg-indigo-600 border-indigo-500 text-white shadow-md'
-                            : 'bg-white border-slate-200 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50/50'
+                            : 'bg-gray-900 border-gray-800 text-gray-200 hover:border-indigo-300 hover:bg-indigo-50/50'
                         }`}
                       >
                         <span>{item.label}</span>
@@ -406,7 +406,7 @@ export const ExcelImportWizard: React.FC<ExcelImportWizardProps> = ({
               </div>
             </div>
 
-            <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-between shrink-0">
+            <div className="p-4 bg-gray-900 border-t border-gray-800 flex justify-between shrink-0">
               <button
                 type="button"
                 onClick={() => {

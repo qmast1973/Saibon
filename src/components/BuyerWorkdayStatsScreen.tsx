@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { Transaction, User } from '../types';
+import { CollectionList } from './CollectionList';
 import {
   normalizeMarketName,
   normalizeFloorValue,
@@ -24,7 +25,8 @@ import {
   UserCheck,
   Plus,
   RefreshCw,
-  FileSpreadsheet
+  FileSpreadsheet,
+  X
 } from 'lucide-react';
 
 interface BuyerWorkdayStatsScreenProps {
@@ -55,6 +57,9 @@ export const BuyerWorkdayStatsScreen: React.FC<BuyerWorkdayStatsScreenProps> = R
   const [selectedBuilding, setSelectedBuilding] = useState<string>('');
   const [selectedFloor, setSelectedFloor] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [showOrderListModal, setShowOrderListModal] = useState(false);
+  const [orderListStore, setOrderListStore] = useState("");
+
   const [searchQuery, setSearchQuery] = useState<string>('');
     const [activeActionType, setActiveActionType] = useState<'주문' | '미송' | '반품' | null>(null);
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -252,6 +257,56 @@ export const BuyerWorkdayStatsScreen: React.FC<BuyerWorkdayStatsScreenProps> = R
       totalExpense
     };
   }, [scopeOrders]);
+
+  const groups = useMemo(() => {
+    const map = new Map<string, {
+      store: string;
+      region: string;
+      manager: string;
+      orderCount: number;
+      completedCount: number;
+      unprocessedCount: number;
+      totalExpense: number;
+      totalItemCount: number;
+      totalIncome: number;
+      orders: Transaction[];
+    }>();
+
+    filteredOrders.forEach(t => {
+      const key = (t.store || '미지정').trim();
+      if (!map.has(key)) {
+        map.set(key, {
+          store: key,
+          region: t.region || '',
+          manager: t.actualManager || t.assignedManager || t.manager || '미배정',
+          orderCount: 0,
+          completedCount: 0,
+          unprocessedCount: 0,
+          totalExpense: 0,
+          totalIncome: 0,
+          totalItemCount: 0,
+          orders: []
+        });
+      }
+      const g = map.get(key)!;
+      g.totalExpense += Number(t.expense) || 0;
+      g.totalIncome += Number(t.income) || 0;
+      g.totalItemCount += Number(t.itemCount) || 0;
+      
+      const isOrder = normalizeMarketName(t.market || '') !== '입금' && normalizeMarketName(t.market || '') !== '미수금';
+      if (isOrder) {
+        g.orderCount += 1;
+        if ((t.status || '').trim() !== '') {
+          g.completedCount += 1;
+        } else {
+          g.unprocessedCount += 1;
+        }
+      }
+      g.orders.push(t);
+    });
+
+    return Array.from(map.values()).sort((a, b) => a.store.localeCompare(b.store, 'ko'));
+  }, [filteredOrders]);
 
   // Update Status (완료 / 미송 / 반품)
   const handleUpdateStatus = async (tx: Transaction, newStatus: string) => {
@@ -606,119 +661,14 @@ export const BuyerWorkdayStatsScreen: React.FC<BuyerWorkdayStatsScreenProps> = R
           </div>
         </div>
 
-        {/* Order Cards List */}
-        <div className="space-y-3 pb-24">
-          {filteredOrders.length === 0 ? (
-            <div className="bg-gray-800 border border-gray-700 rounded-xl p-10 text-center text-gray-400">
-              해당 조건의 주문 내역이 없습니다.
-            </div>
-          ) : (
-            filteredOrders.map(order => {
-              const statusStr = (order.status || '').trim();
-              const isAnyCompleted = statusStr !== '';
-              const isOrderComplete = statusStr === '완료' || statusStr === '주문찾기' || statusStr === '매입처리' || statusStr === '주고옴' || statusStr === '샘플' || statusStr === '주문없음' || statusStr === '물건없음';
-              const isPending = statusStr === '미송' || statusStr === '올미송(결제만)' || statusStr === '미송(찾기)' || statusStr === '찾기';
-              const isReturn = statusStr === '반품' || statusStr === '반품/교환' || statusStr === '반품만' || statusStr === '교환' || statusStr === '반송' || statusStr === '교환매입' || statusStr === '교환 매입' || statusStr === '교환/매입';
-
-              return (
-                <div
-                  key={order.id}
-                  className={`border rounded-xl p-3.5 sm:p-4 shadow-md transition ${
-                    isOrderComplete ? 'bg-green-900/20 border-green-800' :
-                    isPending ? 'bg-yellow-900/20 border-yellow-800' :
-                    isReturn ? 'bg-red-900/20 border-red-800' :
-                    'bg-gray-900 border-gray-800 hover:border-gray-700'
-                  }`}
-                >
-                  {/* Top Badge: Market / Floor / Room & Store Name */}
-                  <div className="flex flex-col gap-2 mb-3 pb-2.5 border-b border-gray-800">
-                    <div className="flex flex-col sm:flex-row sm:justify-between items-start gap-2 sm:gap-2">
-                      <div className="flex flex-wrap items-center gap-2 flex-1">
-                        <div className="bg-blue-950 border border-blue-600 text-cyan-200 text-sm sm:text-base font-extrabold px-3 py-1.5 rounded-lg shadow inline-flex items-center gap-1.5 shrink-0">
-                          <span>🏢</span>
-                          <span>{order.market || '건물 미지정'}</span>
-                          <span className="text-yellow-300 ml-1">
-                            {String(order.floor || '').replace(/층$/, '') ? `${String(order.floor || '').replace(/층$/, '')}층` : ''}
-                          </span>
-                          <span className="text-white ml-1 font-mono">
-                            {String(order.room || '').replace(/호$/, '') ? `${String(order.room || '').replace(/호$/, '')}호` : ''}
-                          </span>
-                        </div>
-                        
-                        <div className="flex items-center gap-2 flex-wrap min-w-0">
-                          <h2 className="text-lg sm:text-xl font-black text-white tracking-wide break-keep shrink-0">
-                            {order.store || '상호 미등록'}
-                          </h2>
-                          {order.region && (
-                            <span className="text-[11px] text-violet-300 bg-violet-900/60 border border-violet-700/60 px-2 py-0.5 rounded-md font-bold shrink-0 mt-0.5 sm:mt-0">
-                              {order.region}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1.5 flex-wrap justify-end shrink-0 self-end sm:self-auto">
-                        <span className={`text-xs px-2 py-0.5 rounded-md font-black border flex items-center gap-1 shadow-sm ${
-                          !isAnyCompleted ? 'bg-amber-950 text-amber-500 border-amber-800' :
-                          statusStr === '주문없음' || statusStr === '물건없음' ? 'bg-slate-900 text-slate-200 border-slate-600' :
-                          isOrderComplete ? 'bg-emerald-950 text-emerald-300 border-emerald-500' :
-                          isPending ? 'bg-yellow-950 text-yellow-300 border-yellow-500' :
-                          isReturn ? 'bg-rose-950 text-rose-300 border-rose-500' :
-                          'bg-indigo-950 text-indigo-300 border-indigo-500'
-                        }`}>
-                          <span>{!isAnyCompleted ? '처리 대기' : `✓ ${order.status}`}</span>
-                        </span>
-                        <span className="text-xs bg-gray-800 text-gray-300 px-2.5 py-1 rounded-md font-bold border border-gray-700">
-                          담당: {order.actualManager || order.assignedManager || order.manager || '미배정'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Payment Input */}
-                  <div className="flex justify-end items-center gap-3 mb-3">
-                    <div className="flex gap-2 items-end shrink-0">
-                      <div className="flex flex-col items-end">
-                        <div className="mb-1">
-                          <div className="flex items-center gap-1">
-                            <input type="checkbox" checked={!!order.isReturn} readOnly className="w-3 h-3 text-red-500 rounded bg-gray-800 border-gray-700" />
-                            <label className="text-[10px] text-red-400 font-semibold">반품있음</label>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <label className="text-sm text-gray-300 font-bold shrink-0">물건갯수</label>
-                          <div className="bg-gray-800 text-white border border-gray-700 w-14 sm:w-16 p-1.5 rounded-lg text-center font-black text-sm sm:text-base cursor-default select-none">{order.itemCount ?? 0}</div>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end">
-                        <label className="text-[10px] text-gray-400 mb-0.5 font-semibold">대납금</label>
-                        <div className="relative flex items-center">
-                          <div className="bg-gray-800 text-amber-400 border border-gray-700 w-28 sm:w-32 p-1.5 pr-10 rounded-lg text-right font-black text-sm sm:text-base cursor-default select-none overflow-hidden">{order.expense ? order.expense.toLocaleString() : ''}</div>
-                          <span className="absolute right-2 text-gray-400 text-xs font-medium pointer-events-none">,000원</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Order Remark (Readonly) */}
-                  {order.remark && (
-                    <div className="mb-2 text-xs text-gray-400 break-words whitespace-pre-wrap leading-relaxed">
-                      주문내용: <span className="text-gray-300">{order.remark}</span>
-                    </div>
-                  )}
-
-                  {/* Memo Input (Readonly processingRemark) */}
-                  <div className="mb-3">
-                    <div className="w-full bg-gray-800 text-amber-300 border border-gray-700 p-2.5 rounded-lg text-xs sm:text-sm cursor-default select-none min-h-[38px]">{order.processingRemark || '특이사항 없음'}</div>
-                  </div>
-
-                  {/* Status Buttons (완료 / 미송 / 반품) */}
-                                  </div>
-              );
-            })
-          )}
-        </div>
-
+        
+        <CollectionList 
+          groups={groups} 
+          mode="stats" 
+          theme="dark" 
+          onOpenOrderDetail={onOpenOrder}
+        />
+        
         {/* 맨밑: 선택한 날짜만 데이터 저장하는 방식의 엑셀데이터 저장 버튼 */}
         <div id="bottomExcelExportSectionStats" className="mt-8 pt-6 border-t border-gray-800">
           <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 sm:p-6 text-center shadow-lg">

@@ -24,6 +24,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 }) => {
   const user = users.find(u => u.username === username);
   const isAdmin = currentUser?.role === 'admin';
+  const isSubAdmin = currentUser?.role === 'buyer' && currentUser?.isBuyerAdmin;
+  const canEditMarkets = isAdmin || isSubAdmin;
   const isEditingOther = isAdmin && user?.username !== currentUser?.username;
 
   const [role, setRole] = useState<UserRole>(user?.role || 'merchant');
@@ -83,7 +85,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const merchants = users.filter(u => u.role === 'merchant');
 
   const toggleMarket = (marketName: string) => {
-    if (!isAdmin) return;
+    if (!canEditMarkets) return;
     const normalized = normalizeMarketName(marketName);
     if (allowedMarkets.includes(normalized)) {
       setAllowedMarkets(allowedMarkets.filter(m => m !== normalized));
@@ -166,7 +168,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
   return (
     <div id="profileModal" className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[280] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200 my-auto flex flex-col max-h-[90vh]">
+      <div className="bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-gray-800 my-auto flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="bg-indigo-900 text-white px-5 py-4 flex items-center justify-between shrink-0">
           <div>
@@ -186,22 +188,22 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         {/* Form */}
         <form onSubmit={handleSave} className="p-5 space-y-3.5 text-xs overflow-y-auto flex-1">
           <div>
-            <label className="block font-semibold text-slate-700 mb-1">아이디</label>
+            <label className="block font-semibold text-gray-200 mb-1">아이디</label>
             <input
               type="text"
               disabled
               value={user.username}
-              className="w-full border border-slate-200 rounded-xl p-2.5 bg-slate-100 text-slate-500 font-mono"
+              className="w-full border border-gray-800 rounded-xl p-2.5 bg-gray-950 text-gray-400 font-mono"
             />
           </div>
 
           <div>
-            <label className="block font-semibold text-slate-700 mb-1">회원 유형</label>
+            <label className="block font-semibold text-gray-200 mb-1">회원 유형</label>
             <select
               disabled={!isEditingOther}
               value={role}
               onChange={(e) => setRole(e.target.value as UserRole)}
-              className={`w-full border border-slate-300 rounded-xl p-2.5 bg-slate-50 outline-none ${!isEditingOther ? 'bg-slate-100 cursor-not-allowed text-slate-600' : 'focus:ring-2 focus:ring-indigo-500'}`}
+              className={`w-full border border-gray-700 rounded-xl p-2.5 bg-gray-900 outline-none ${!isEditingOther ? 'bg-gray-950 cursor-not-allowed text-gray-300' : 'focus:ring-2 focus:ring-indigo-500'}`}
             >
               <option value="merchant">🏪 상인 (소매점)</option>
               <option value="local">🚚 지방 삼촌</option>
@@ -211,59 +213,59 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           </div>
 
           <div>
-            <label className="block font-semibold text-slate-700 mb-1">이름 *</label>
+            <label className="block font-semibold text-gray-200 mb-1">이름 *</label>
             <input
               type="text"
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full border border-slate-300 rounded-xl p-2.5 bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none focus:bg-white"
+              className="w-full border border-gray-700 rounded-xl p-2.5 bg-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none focus:bg-gray-900"
             />
           </div>
 
           <div>
-            <label className="block font-semibold text-slate-700 mb-1">이메일 (Firebase Auth 연동)</label>
+            <label className="block font-semibold text-gray-200 mb-1">이메일 (Firebase Auth 연동)</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="user@example.com"
-              className="w-full border border-slate-300 rounded-xl p-2.5 bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none focus:bg-white"
+              className="w-full border border-gray-700 rounded-xl p-2.5 bg-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none focus:bg-gray-900"
             />
           </div>
 
           {role === 'merchant' && (
             <>
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">상호명 *</label>
+                <label className="block font-semibold text-gray-200 mb-1">상호명 *</label>
                 <input
                   type="text"
                   required
                   value={storeName}
                   onChange={(e) => setStoreName(e.target.value)}
-                  className="w-full border border-slate-300 rounded-xl p-2.5 bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none focus:bg-white"
+                  className="w-full border border-gray-700 rounded-xl p-2.5 bg-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none focus:bg-gray-900"
                 />
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">사업자등록번호</label>
+                <label className="block font-semibold text-gray-200 mb-1">사업자등록번호</label>
                 <input
                   type="text"
                   value={businessNumber}
                   onChange={(e) => setBusinessNumber(e.target.value)}
                   placeholder="예: 123-45-67890"
-                  className="w-full border border-slate-300 rounded-xl p-2.5 bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none focus:bg-white"
+                  className="w-full border border-gray-700 rounded-xl p-2.5 bg-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none focus:bg-gray-900"
                 />
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">가게 주소</label>
+                <label className="block font-semibold text-gray-200 mb-1">가게 주소</label>
                 <input
                   type="text"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   placeholder="매장 상세 주소"
-                  className="w-full border border-slate-300 rounded-xl p-2.5 bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none focus:bg-white"
+                  className="w-full border border-gray-700 rounded-xl p-2.5 bg-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none focus:bg-gray-900"
                 />
               </div>
             </>
@@ -305,14 +307,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               )}
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="font-semibold text-slate-700">담당 건물 지정 (서울 사입삼촌)</label>
+                  <label className="font-semibold text-gray-200">담당 건물 지정 (서울 사입삼촌)</label>
                   <span className="text-[10px] text-indigo-600 font-bold">{allowedMarkets.length}개 선택</span>
                 </div>
-              <div className="border border-slate-300 rounded-xl p-2 bg-slate-50 max-h-40 overflow-y-auto space-y-1">
+              <div className="border border-gray-700 rounded-xl p-2 bg-gray-900 max-h-40 overflow-y-auto space-y-1">
                 {allMarkets.map(m => {
                   if (m === '===== 남대문 =====') {
                     return (
-                      <div key={m} className="px-2 py-2 my-1 text-center font-bold text-slate-500 bg-slate-200/50 rounded-lg text-[11px]">
+                      <div key={m} className="px-2 py-2 my-1 text-center font-bold text-gray-400 bg-slate-200/50 rounded-lg text-[11px]">
                         {m}
                       </div>
                     );
@@ -328,7 +330,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                       key={m}
                       className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition ${
                         isOccupiedByOther
-                          ? 'bg-slate-100 opacity-60'
+                          ? 'bg-gray-950 opacity-60'
                           : isChecked
                           ? 'bg-indigo-100 text-indigo-900 font-bold'
                           : 'hover:bg-slate-200/60 cursor-pointer'
@@ -337,13 +339,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                       <input
                         type="checkbox"
                         checked={isChecked}
-                        disabled={!isAdmin}
+                        disabled={!canEditMarkets}
                         onChange={() => toggleMarket(m)}
                         className="w-3.5 h-3.5 text-indigo-600 rounded"
                       />
                       <span>{m}</span>
                       {isOccupiedByOther && (
-                        <span className="text-[10px] text-slate-400 ml-auto font-normal">
+                        <span className="text-[10px] text-gray-500 ml-auto font-normal">
                           {otherOwners.join(', ')} 담당
                         </span>
                       )}
@@ -358,10 +360,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           {role === 'local' && (
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="font-semibold text-slate-700">담당 상인 거래처 지정</label>
+                <label className="font-semibold text-gray-200">담당 상인 거래처 지정</label>
                 <span className="text-[10px] text-emerald-600 font-bold">{assignedMerchants.length}곳 선택</span>
               </div>
-              <div className="border border-slate-300 rounded-xl p-2 bg-slate-50 max-h-40 overflow-y-auto space-y-1">
+              <div className="border border-gray-700 rounded-xl p-2 bg-gray-900 max-h-40 overflow-y-auto space-y-1">
                 {merchants.length > 0 ? (
                   merchants.map(m => {
                     const isChecked = assignedMerchants.includes(m.username);
@@ -373,7 +375,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                       key={m.username}
                       className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition ${
                         isOccupiedByOther
-                          ? 'bg-slate-100 opacity-60'
+                          ? 'bg-gray-950 opacity-60'
                           : isChecked
                           ? 'bg-emerald-100 text-emerald-900 font-bold'
                           : 'hover:bg-slate-200/60 cursor-pointer'
@@ -387,39 +389,39 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                         className="w-3.5 h-3.5 text-emerald-600 rounded"
                       />
                       <span>{m.storeName || m.name}</span>
-                      <span className="text-[10px] text-slate-400 font-mono">({m.username})</span>
+                      <span className="text-[10px] text-gray-500 font-mono">({m.username})</span>
                       {isOccupiedByOther && (
-                        <span className="text-[10px] text-slate-400 ml-auto font-normal">
+                        <span className="text-[10px] text-gray-500 ml-auto font-normal">
                           {otherOwners.join(', ')} 담당
                         </span>
                       )}
                     </label>
                   )})
                 ) : (
-                  <div className="text-center py-4 text-slate-400 text-[11px]">등록된 상인이 없습니다.</div>
+                  <div className="text-center py-4 text-gray-500 text-[11px]">등록된 상인이 없습니다.</div>
                 )}
               </div>
             </div>
           )}
 
           <div>
-            <label className="block font-semibold text-slate-700 mb-1">전화번호</label>
+            <label className="block font-semibold text-gray-200 mb-1">전화번호</label>
             <input
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="010-0000-0000"
-              className="w-full border border-slate-300 rounded-xl p-2.5 bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none focus:bg-white"
+              className="w-full border border-gray-700 rounded-xl p-2.5 bg-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none focus:bg-gray-900"
             />
           </div>
 
           {isAdmin && (
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">승인 상태</label>
+              <label className="block font-semibold text-gray-200 mb-1">승인 상태</label>
               <select
                 value={approved ? 'true' : 'false'}
                 onChange={(e) => setApproved(e.target.value === 'true')}
-                className="w-full border border-slate-300 rounded-xl p-2.5 bg-slate-50 font-bold text-slate-800"
+                className="w-full border border-gray-700 rounded-xl p-2.5 bg-gray-900 font-bold text-gray-100"
               >
                 <option value="true">✅ 승인됨 (로그인 가능)</option>
                 <option value="false">⏳ 승인대기 (로그인 불가)</option>
@@ -428,8 +430,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           )}
 
           <div>
-            <label className="block font-semibold text-slate-700 mb-1">
-              새 비밀번호 <span className="font-normal text-slate-400">(변경할 때만 입력)</span>
+            <label className="block font-semibold text-gray-200 mb-1">
+              새 비밀번호 <span className="font-normal text-gray-500">(변경할 때만 입력)</span>
             </label>
             <div className="relative">
               <input
@@ -439,12 +441,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 placeholder="변경하지 않으면 비워두세요 (6자 이상)"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value.replace(/[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/g, ''))}
-                className="w-full border border-slate-300 rounded-xl p-2.5 pr-10 bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none focus:bg-white"
+                className="w-full border border-gray-700 rounded-xl p-2.5 pr-10 bg-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none focus:bg-gray-900"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 p-1"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -465,7 +467,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition"
+              className="px-4 py-2.5 rounded-xl bg-gray-950 hover:bg-slate-200 text-gray-200 font-semibold transition"
             >
               취소
             </button>
