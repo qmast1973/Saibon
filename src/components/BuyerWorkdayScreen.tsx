@@ -73,8 +73,17 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(
     const buildings = dateOrders
       .map(item => normalizeMarketName(item.market))
       .filter(Boolean);
-    return ([...new Set(buildings)] as string[]).sort((a, b) => a.localeCompare(b, 'ko'));
-  }, [dateOrders]);
+      
+    const allBlds = new Set(buildings);
+    
+    // For admins/buyerAdmins, dateOrders may be empty if there are no orders yet for the day.
+    // If they have explicit allowedMarkets, show them.
+    if (currentUser.allowedMarkets) {
+        currentUser.allowedMarkets.forEach(m => allBlds.add(normalizeMarketName(m)));
+    }
+    
+    return ([...allBlds] as string[]).sort((a, b) => a.localeCompare(b, 'ko'));
+  }, [dateOrders, currentUser]);
 
   // Unique floors based on selected building
   const uniqueFloors = useMemo(() => {

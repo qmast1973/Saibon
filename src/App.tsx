@@ -185,6 +185,11 @@ export default function App() {
     init();
   }, [cleanTransactions, setCleanTransactions]);
 
+  const transactionsRef = React.useRef(transactions);
+  const currentUserRef = React.useRef(currentUser);
+  useEffect(() => { transactionsRef.current = transactions; }, [transactions]);
+  useEffect(() => { currentUserRef.current = currentUser; }, [currentUser]);
+
   // 2. Real-time Firebase Sync Listeners
   useEffect(() => {
     const unsubUsers = syncFirebaseUsers((firebaseUsers) => {
@@ -193,8 +198,9 @@ export default function App() {
         firebaseUsers.forEach(u => saveLocalUser(u));
 
         // Keep currentUser updated with latest permissions/approval
-        if (currentUser) {
-          const fresh = firebaseUsers.find(u => u.username === currentUser.username);
+        const currentU = currentUserRef.current;
+        if (currentU) {
+          const fresh = firebaseUsers.find(u => u.username === currentU.username);
           if (fresh) {
             setCurrentUser(fresh);
             setSessionUser(fresh);
@@ -204,24 +210,26 @@ export default function App() {
     });
 
     const unsubOrders = syncFirebaseOrders((firebaseOrders) => {
+      const prevTransactions = transactionsRef.current;
+      const currentU = currentUserRef.current;
       // Check if this is an update (not initial load) and if there are new orders relevant to current user
-      if (transactions.length > 0 && currentUser?.role === 'buyer') {
+      if (prevTransactions.length > 0 && currentU?.role === 'buyer') {
         // Compare previous and new orders to find additions
-        const prevIds = new Set(transactions.map(t => t.id));
+        const prevIds = new Set(prevTransactions.map(t => t.id));
         const newOrders = firebaseOrders.filter(t => !prevIds.has(t.id));
         
         if (newOrders.length > 0) {
           // Find orders that match the buyer's assigned markets/regions
           const relevantNewOrders = newOrders.filter(order => {
-            if (currentUser.isBuyerAdmin) return true; // Admin sees all new orders
+            if (currentU.isBuyerAdmin) return true; // Admin sees all new orders
             
             let isRelevant = false;
-            if (currentUser.allowedMarkets && currentUser.allowedMarkets.length > 0) {
+            if (currentU.allowedMarkets && currentU.allowedMarkets.length > 0) {
               const normMarket = normalizeMarketName(order.market);
-              isRelevant = currentUser.allowedMarkets.some(m => normalizeMarketName(m) === normMarket);
+              isRelevant = currentU.allowedMarkets.some(m => normalizeMarketName(m) === normMarket);
             }
-            if (!isRelevant && currentUser.assignedRegion && currentUser.assignedRegion !== '전체') {
-              isRelevant = order.region === currentUser.assignedRegion;
+            if (!isRelevant && currentU.assignedRegion && currentU.assignedRegion !== '전체') {
+              isRelevant = order.region === currentU.assignedRegion;
             }
             return isRelevant;
           });
@@ -255,7 +263,7 @@ export default function App() {
       unsubUsers();
       unsubOrders();
           };
-  }, [currentUser?.username, setCleanTransactions, transactions]);
+  }, [currentUser?.username, setCleanTransactions]);
 
   // Handle Login & Logout
   const handleLoginSuccess = async (user: User) => {
@@ -277,6 +285,13 @@ export default function App() {
     await clearSessionUser();
     setCurrentUser(null);
     setShowBuyerWorkdayScreen(false);
+    setShowBuyerWorkdayStatsScreen(false);
+    setShowOrderModal(false);
+    setShowCollectionScreen(false);
+    setShowBoardScreen(false);
+    setShowProfileModal(false);
+    setShowMerchantInfoModal(false);
+    setShowAdminUserManagementModal(false);
   };
 
   // Role-based visibility base

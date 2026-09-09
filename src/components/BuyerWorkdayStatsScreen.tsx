@@ -72,8 +72,15 @@ export const BuyerWorkdayStatsScreen: React.FC<BuyerWorkdayStatsScreenProps> = R
     const buildings = dateOrders
       .map(item => normalizeMarketName(item.market))
       .filter(Boolean);
-    return ([...new Set(buildings)] as string[]).sort((a, b) => a.localeCompare(b, 'ko'));
-  }, [dateOrders]);
+      
+    const allBlds = new Set(buildings);
+    
+    if (currentUser.allowedMarkets) {
+        currentUser.allowedMarkets.forEach(m => allBlds.add(normalizeMarketName(m)));
+    }
+    
+    return ([...allBlds] as string[]).sort((a, b) => a.localeCompare(b, 'ko'));
+  }, [dateOrders, currentUser]);
 
   // Unique floors based on selected building
   const uniqueFloors = useMemo(() => {
