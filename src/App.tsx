@@ -83,17 +83,12 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
+    if (!isInitializing && currentUser && 'Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
-  }, []);
+  }, [isInitializing, currentUser]);
 
-  // Request Notification permission on mount
-  useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
-  }, []);
+
 
   const [collections, setCollections] = useState<CollectionRecord[]>([]);
   const [collectionGroupRules, setCollectionGroupRules] = useState<CollectionGroupRule[]>([]);
