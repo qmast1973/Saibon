@@ -197,47 +197,39 @@ export default function App() {
 
     const unsubOrders = syncFirebaseOrders((firebaseOrders) => {
       // Check if this is an update (not initial load) and if there are new orders relevant to current user
-      setCleanTransactions(prev => {
-        if (prev.length > 0 && currentUser?.role === 'buyer') {
-          // Compare previous and new orders to find additions
-          const prevIds = new Set(prev.map(t => t.id));
-          const newOrders = firebaseOrders.filter(t => !prevIds.has(t.id));
-          
-          if (newOrders.length > 0) {
-            // Find orders that match the buyer's assigned markets/regions
-            const relevantNewOrders = newOrders.filter(order => {
-              if (currentUser.isBuyerAdmin) return true; // Admin sees all new orders
-              
-              let isRelevant = false;
-              if (currentUser.allowedMarkets && currentUser.allowedMarkets.length > 0) {
-                const normMarket = normalizeMarketName(order.market);
-                isRelevant = currentUser.allowedMarkets.some(m => normalizeMarketName(m) === normMarket);
-              }
-              if (!isRelevant && currentUser.assignedRegion && currentUser.assignedRegion !== '전체') {
-                isRelevant = order.region === currentUser.assignedRegion;
-              }
-              return isRelevant;
-            });
-
-            if (relevantNewOrders.length > 0) {
-              const orderText = relevantNewOrders.length === 1 
-                ? `${relevantNewOrders[0].market} ${relevantNewOrders[0].store}`
-                : `${relevantNewOrders.length}건의 주문`;
-                
-              setToastMessage(`🔔 새 주문 알림: ${orderText}`);
-              setTimeout(() => setToastMessage(null), 5000); // 5초 후 사라짐
-              
-              // Optional: Play sound if user has interacted with the document
-              try {
-                const audio = new Audio('/notification.mp3'); // Needs a sound file, but standard beep works via browser
-                // Or simpler silent beep via beep API if supported, or just ignore sound for now
-              } catch (e) {}
+      if (transactions.length > 0 && currentUser?.role === 'buyer') {
+        // Compare previous and new orders to find additions
+        const prevIds = new Set(transactions.map(t => t.id));
+        const newOrders = firebaseOrders.filter(t => !prevIds.has(t.id));
+        
+        if (newOrders.length > 0) {
+          // Find orders that match the buyer's assigned markets/regions
+          const relevantNewOrders = newOrders.filter(order => {
+            if (currentUser.isBuyerAdmin) return true; // Admin sees all new orders
+            
+            let isRelevant = false;
+            if (currentUser.allowedMarkets && currentUser.allowedMarkets.length > 0) {
+              const normMarket = normalizeMarketName(order.market);
+              isRelevant = currentUser.allowedMarkets.some(m => normalizeMarketName(m) === normMarket);
             }
+            if (!isRelevant && currentUser.assignedRegion && currentUser.assignedRegion !== '전체') {
+              isRelevant = order.region === currentUser.assignedRegion;
+            }
+            return isRelevant;
+          });
+
+          if (relevantNewOrders.length > 0) {
+            const orderText = relevantNewOrders.length === 1 
+              ? `${relevantNewOrders[0].market} ${relevantNewOrders[0].store}`
+              : `${relevantNewOrders.length}건의 주문`;
+              
+            setToastMessage(`🔔 새 주문 알림: ${orderText}`);
+            setTimeout(() => setToastMessage(null), 5000); // 5초 후 사라짐
           }
         }
-        return firebaseOrders;
-      });
-      
+      }
+
+      setCleanTransactions(firebaseOrders);
       saveTransactionsToIndexedDB(firebaseOrders);
     });
 
@@ -246,7 +238,7 @@ export default function App() {
       unsubUsers();
       unsubOrders();
           };
-  }, [currentUser?.username, setCleanTransactions]);
+  }, [currentUser?.username, setCleanTransactions, transactions]);
 
   // Handle Login & Logout
   const handleLoginSuccess = async (user: User) => {
