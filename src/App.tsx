@@ -82,6 +82,19 @@ export default function App() {
   const [showBoardScreen, setShowBoardScreen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  // Request Notification permission on mount
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
+
   const [collections, setCollections] = useState<CollectionRecord[]>([]);
   const [collectionGroupRules, setCollectionGroupRules] = useState<CollectionGroupRule[]>([]);
   const [showCollectionScreen, setShowCollectionScreen] = useState(false);
@@ -225,6 +238,15 @@ export default function App() {
               
             setToastMessage(`🔔 새 주문 알림: ${orderText}`);
             setTimeout(() => setToastMessage(null), 5000); // 5초 후 사라짐
+
+            if ('Notification' in window && Notification.permission === 'granted') {
+              if (document.hidden) {
+                new Notification('사입ON - 새 주문 알림', {
+                  body: orderText,
+                  icon: '/pwa-192x192.png',
+                });
+              }
+            }
           }
         }
       }

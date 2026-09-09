@@ -107,11 +107,9 @@ export const FullLedgerView: React.FC<FullLedgerViewProps> = React.memo(({
                     {formatMoney(t.income)}
                   </td>
                   <td className="p-3 text-center whitespace-nowrap">
-                    {t.status ? (
-                      <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-slate-200">
-                        {t.status}
-                      </span>
-                    ) : '-'}
+                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${t.status ? 'bg-slate-100 text-slate-700 border-slate-200' : 'bg-amber-50 text-amber-600 border-amber-200'}`}>
+                      {t.status || '처리 대기'}
+                    </span>
                   </td>
                   <td className="p-3 text-slate-500 max-w-xs truncate">
                     {[t.remark, t.processingRemark].filter(Boolean).join(' | ') || '-'}

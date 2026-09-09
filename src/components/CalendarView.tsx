@@ -299,15 +299,14 @@ export const CalendarView: React.FC<CalendarViewProps> = React.memo(({
                           {t.manager}
                         </span>
                       )}
-                      {t.status && (
-                        <span
-                          className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                            isCompleted ? 'bg-emerald-200 text-emerald-800' : 'bg-slate-200 text-slate-700'
-                          }`}
-                        >
-                          {t.status}
-                        </span>
-                      )}
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                          isCompleted ? 'bg-emerald-200 text-emerald-800' : 
+                          t.status ? 'bg-slate-200 text-slate-700' : 'bg-amber-100 text-amber-700'
+                        }`}
+                      >
+                        {t.status || '처리 대기'}
+                      </span>
                     </div>
 
                     <div className="flex items-center gap-1">
@@ -315,11 +314,11 @@ export const CalendarView: React.FC<CalendarViewProps> = React.memo(({
                         <button
                           type="button"
                           onClick={() => onCompleteTransaction(t.id)}
-                          className="text-emerald-600 hover:text-emerald-800 p-1 font-bold text-[10px] flex items-center gap-0.5"
+                          className="bg-emerald-50 border border-emerald-200 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-800 px-1.5 py-0.5 rounded font-bold text-[10px] flex items-center gap-0.5 transition"
                           title="완료 처리"
                         >
                           <CheckCircle2 className="w-3.5 h-3.5" />
-                          완료
+                          완료처리
                         </button>
                       )}
                       <button

@@ -607,17 +607,16 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(
                       </div>
 
                       <div className="flex items-center gap-1.5 flex-wrap justify-end shrink-0 self-end sm:self-auto">
-                        {isAnyCompleted && (
-                          <span className={`text-xs px-2 py-0.5 rounded-md font-black border flex items-center gap-1 shadow-sm ${
-                            statusStr === '주문없음' || statusStr === '물건없음' ? 'bg-slate-900 text-slate-200 border-slate-600' :
-                            isOrderComplete ? 'bg-emerald-950 text-emerald-300 border-emerald-500' :
-                            isPending ? 'bg-yellow-950 text-yellow-300 border-yellow-500' :
-                            isReturn ? 'bg-rose-950 text-rose-300 border-rose-500' :
-                            'bg-indigo-950 text-indigo-300 border-indigo-500'
-                          }`}>
-                            <span>✓ {order.status}</span>
-                          </span>
-                        )}
+                        <span className={`text-xs px-2 py-0.5 rounded-md font-black border flex items-center gap-1 shadow-sm ${
+                          !isAnyCompleted ? 'bg-amber-950 text-amber-500 border-amber-800' :
+                          statusStr === '주문없음' || statusStr === '물건없음' ? 'bg-slate-900 text-slate-200 border-slate-600' :
+                          isOrderComplete ? 'bg-emerald-950 text-emerald-300 border-emerald-500' :
+                          isPending ? 'bg-yellow-950 text-yellow-300 border-yellow-500' :
+                          isReturn ? 'bg-rose-950 text-rose-300 border-rose-500' :
+                          'bg-indigo-950 text-indigo-300 border-indigo-500'
+                        }`}>
+                          <span>{!isAnyCompleted ? '처리 대기' : `✓ ${order.status}`}</span>
+                        </span>
                         <span className="text-xs bg-gray-800 text-gray-300 px-2.5 py-1 rounded-md font-bold border border-gray-700">
                           담당: {order.actualManager || order.assignedManager || order.manager || '미배정'}
                         </span>
@@ -798,7 +797,7 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(
         : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-white hover:bg-gray-700'
     }`}
   >
-    {isOrderComplete ? order.status : '주문처리'}
+    {isOrderComplete ? order.status : '완료처리'}
   </button>
 
                         <button
