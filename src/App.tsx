@@ -80,6 +80,7 @@ export default function App() {
     const [showBuyerWorkdayScreen, setShowBuyerWorkdayScreen] = useState(false);
   const [showBuyerWorkdayStatsScreen, setShowBuyerWorkdayStatsScreen] = useState(false);
   const [showBoardScreen, setShowBoardScreen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const [collections, setCollections] = useState<CollectionRecord[]>([]);
   const [collectionGroupRules, setCollectionGroupRules] = useState<CollectionGroupRule[]>([]);
@@ -195,7 +196,48 @@ export default function App() {
     });
 
     const unsubOrders = syncFirebaseOrders((firebaseOrders) => {
-      setCleanTransactions(firebaseOrders);
+      // Check if this is an update (not initial load) and if there are new orders relevant to current user
+      setCleanTransactions(prev => {
+        if (prev.length > 0 && currentUser?.role === 'buyer') {
+          // Compare previous and new orders to find additions
+          const prevIds = new Set(prev.map(t => t.id));
+          const newOrders = firebaseOrders.filter(t => !prevIds.has(t.id));
+          
+          if (newOrders.length > 0) {
+            // Find orders that match the buyer's assigned markets/regions
+            const relevantNewOrders = newOrders.filter(order => {
+              if (currentUser.isBuyerAdmin) return true; // Admin sees all new orders
+              
+              let isRelevant = false;
+              if (currentUser.allowedMarkets && currentUser.allowedMarkets.length > 0) {
+                const normMarket = normalizeMarketName(order.market);
+                isRelevant = currentUser.allowedMarkets.some(m => normalizeMarketName(m) === normMarket);
+              }
+              if (!isRelevant && currentUser.assignedRegion && currentUser.assignedRegion !== '전체') {
+                isRelevant = order.region === currentUser.assignedRegion;
+              }
+              return isRelevant;
+            });
+
+            if (relevantNewOrders.length > 0) {
+              const orderText = relevantNewOrders.length === 1 
+                ? `${relevantNewOrders[0].market} ${relevantNewOrders[0].store}`
+                : `${relevantNewOrders.length}건의 주문`;
+                
+              setToastMessage(`🔔 새 주문 알림: ${orderText}`);
+              setTimeout(() => setToastMessage(null), 5000); // 5초 후 사라짐
+              
+              // Optional: Play sound if user has interacted with the document
+              try {
+                const audio = new Audio('/notification.mp3'); // Needs a sound file, but standard beep works via browser
+                // Or simpler silent beep via beep API if supported, or just ignore sound for now
+              } catch (e) {}
+            }
+          }
+        }
+        return firebaseOrders;
+      });
+      
       saveTransactionsToIndexedDB(firebaseOrders);
     });
 
@@ -703,6 +745,13 @@ export default function App() {
 
   return (
     <div className="bg-slate-100 text-slate-800 min-h-screen flex flex-col antialiased">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[99999] bg-green-500 text-white px-4 py-3 rounded-full shadow-2xl font-bold flex items-center gap-2 animate-bounce border-2 border-white/20 whitespace-nowrap">
+          {toastMessage}
+        </div>
+      )}
+
       {/* Top Navbar */}
       <Navbar
         currentUser={currentUser}
