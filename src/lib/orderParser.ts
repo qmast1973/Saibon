@@ -38,6 +38,7 @@ export const MARKET_DICTIONARY: { canonical: string; aliases: string[] }[] = [
   { canonical: '평화시장', aliases: ['평화시장', '평화', '평'] },
   { canonical: '통일상가', aliases: ['통일상가', '통일', '통'] },
   { canonical: '동대문종합시장', aliases: ['동대문종합시장', '동대문종합', '종합시장'] },
+  { canonical: '신발상가', aliases: ['신발상가', '청계천신발상가', '동대문신발상가', '신발'] },
   { canonical: '미수금', aliases: ['미수금', '미수'] },
   { canonical: '입금', aliases: ['입금', '송금', '이체'] }
 ];
@@ -45,7 +46,7 @@ export const MARKET_DICTIONARY: { canonical: string; aliases: string[] }[] = [
 /**
  * 텍스트에서 건물명을 탐지하여 표준 명칭으로 변환
  */
-export function matchMarketName(token: string): { canonical: string; matchedAlias: string } | null {
+export function matchMarketName(token: string, exactOnly: boolean = false): { canonical: string; matchedAlias: string } | null {
   const trimmed = token.trim();
   if (!trimmed) return null;
 
@@ -75,6 +76,8 @@ export function matchMarketName(token: string): { canonical: string; matchedAlia
       }
     }
   }
+
+  if (exactOnly) return null;
 
   // 2. 부분 일치: 단, 한 글자 약어('청', '신', '남' 등)는 일반 단어(요청, 신청 등) 오인 방지를 위해 기본적으로 부분 일치 금지!
   // 단, 영문 1글자(예: 'D')는 숫자나 한글 등 다른 문자와 붙어있을 때 단독으로 인식할 수 있도록 허용
@@ -332,38 +335,37 @@ export function parseSmartOrderText(
     // 토큰 단위 분석
     const tokens = cleanLine.split(/\s+/);
     let remainingTokens = [...tokens];
-
-    // A. 건물명 찾기
+    // 복합 건물명 탐색 (예: "APM" "플레이스" 2개 토큰) 우선 확인
     let marketFoundIndex = -1;
-    for (let i = 0; i < remainingTokens.length; i++) {
-      const match = matchMarketName(remainingTokens[i]);
+    for (let i = 0; i < remainingTokens.length - 1; i++) {
+      const combo = `${remainingTokens[i]} ${remainingTokens[i + 1]}`;
+      const match = matchMarketName(combo, true); // 복합 건물명은 완전 일치만 허용
       if (match) {
         detectedMarket = match.canonical;
         marketFoundIndex = i;
-        
-        // 만약 띄어쓰기 없이 붙어있는 경우(예: 디오트4층G16), 건물명만 지우고 나머지는 남김
-        const token = remainingTokens[i];
-        const aliasRegex = new RegExp(match.matchedAlias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-        const replaced = token.replace(aliasRegex, ' ').trim();
-        if (replaced) {
-          const newPieces = replaced.split(/\s+/);
-          remainingTokens.splice(i, 1, ...newPieces);
-        } else {
-          remainingTokens.splice(i, 1);
-        }
+        remainingTokens.splice(i, 2);
         break;
       }
     }
 
-    // 복합 건물명 탐색 (예: "APM" "플레이스" 2개 토큰)
+    // 복합 명칭이 없으면 단일 단어에서 탐색
     if (!detectedMarket) {
-      for (let i = 0; i < remainingTokens.length - 1; i++) {
-        const combo = `${remainingTokens[i]} ${remainingTokens[i + 1]}`;
-        const match = matchMarketName(combo);
+      for (let i = 0; i < remainingTokens.length; i++) {
+        const match = matchMarketName(remainingTokens[i]);
         if (match) {
           detectedMarket = match.canonical;
           marketFoundIndex = i;
-          remainingTokens.splice(i, 2);
+          
+          // 만약 띄어쓰기 없이 붙어있는 경우(예: 디오트4층G16), 건물명만 지우고 나머지는 남김
+          const token = remainingTokens[i];
+          const aliasRegex = new RegExp(match.matchedAlias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+          const replaced = token.replace(aliasRegex, ' ').trim();
+          if (replaced) {
+            const newPieces = replaced.split(/\s+/);
+            remainingTokens.splice(i, 1, ...newPieces);
+          } else {
+            remainingTokens.splice(i, 1);
+          }
           break;
         }
       }
