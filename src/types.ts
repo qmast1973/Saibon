@@ -54,7 +54,8 @@ export interface Transaction {
   itemCount?: number; // 물건 갯수
   isReturn?: boolean;
   status?: string; // e.g. 미송, 반품, 교환, 찾기, 주고옴, 매입처리, 완료, etc.
-  remark?: string; // 비고
+  remark?: string; // 비고 (주문 품목 및 수량 등)
+  processingRemark?: string; // 처리 비고 (삼촌 입력란)
   recordType?: 'order' | 'receivable';
   createdAt?: string;
 }

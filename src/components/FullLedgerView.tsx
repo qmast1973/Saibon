@@ -113,7 +113,9 @@ export const FullLedgerView: React.FC<FullLedgerViewProps> = React.memo(({
                       </span>
                     ) : '-'}
                   </td>
-                  <td className="p-3 text-slate-500 max-w-xs truncate">{t.remark || '-'}</td>
+                  <td className="p-3 text-slate-500 max-w-xs truncate">
+                    {[t.remark, t.processingRemark].filter(Boolean).join(' | ') || '-'}
+                  </td>
                   <td className="p-3 text-center whitespace-nowrap">
                     <button
                       type="button"

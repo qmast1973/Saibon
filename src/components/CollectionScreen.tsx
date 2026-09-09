@@ -828,9 +828,9 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
                             </span>
                           )}
 
-                          {t.remark && (
+                          {(t.remark || t.processingRemark) && (
                             <span className="text-[11px] text-slate-500 truncate bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-100 ml-1">
-                              {t.remark}
+                              {[t.remark, t.processingRemark].filter(Boolean).join(' | ')}
                             </span>
                           )}
                         </div>

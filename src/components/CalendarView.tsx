@@ -355,9 +355,9 @@ export const CalendarView: React.FC<CalendarViewProps> = React.memo(({
                     <span className="text-blue-600">입금: {formatMoney(t.income)}</span>
                   </div>
 
-                  {t.remark && (
+                  {(t.remark || t.processingRemark) && (
                     <div className="text-[10px] text-slate-500 bg-white p-1.5 rounded-lg border border-slate-200">
-                      비고: {t.remark}
+                      비고: {[t.remark, t.processingRemark].filter(Boolean).join(' | ')}
                     </div>
                   )}
                 </div>

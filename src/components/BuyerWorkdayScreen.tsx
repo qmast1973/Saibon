@@ -299,7 +299,7 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(
   };
 
   // Update field (대납금, 메모/비고)
-  const handleUpdateField = async (tx: Transaction, field: 'expense' | 'remark' | 'itemCount' | 'isReturn', value: any) => {
+  const handleUpdateField = async (tx: Transaction, field: 'expense' | 'remark' | 'processingRemark' | 'itemCount' | 'isReturn', value: any) => {
     let updatedTx: Transaction = {
       ...tx,
       [field]: field === 'expense' ? Number(String(value).replace(/[^0-9-]/g, '')) || 0 : field === 'itemCount' ? Number(value) || 0 : field === 'isReturn' ? Boolean(value) : String(value || ''),
@@ -679,12 +679,19 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(
                     </div>
                   </div>
 
-                  {/* Memo Input */}
+                  {/* Order Remark (Readonly) */}
+                  {order.remark && (
+                    <div className="mb-2 text-xs text-gray-400 break-words whitespace-pre-wrap leading-relaxed">
+                      주문내용: <span className="text-gray-300">{order.remark}</span>
+                    </div>
+                  )}
+
+                  {/* Memo Input (처리 비고) */}
                   <div className="mb-3">
                     <input
                       type="text"
-                      defaultValue={order.remark || ''}
-                      onBlur={(e) => handleUpdateField(order, 'remark', e.target.value)}
+                      defaultValue={order.processingRemark || ''}
+                      onBlur={(e) => handleUpdateField(order, 'processingRemark', e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           (e.target as HTMLInputElement).blur();

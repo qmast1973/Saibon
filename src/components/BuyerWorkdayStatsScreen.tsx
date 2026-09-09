@@ -296,7 +296,7 @@ export const BuyerWorkdayStatsScreen: React.FC<BuyerWorkdayStatsScreenProps> = R
   };
 
   // Update field (대납금, 메모/비고)
-  const handleUpdateField = async (tx: Transaction, field: 'expense' | 'remark' | 'itemCount' | 'isReturn', value: any) => {
+  const handleUpdateField = async (tx: Transaction, field: 'expense' | 'remark' | 'processingRemark' | 'itemCount' | 'isReturn', value: any) => {
     let updatedTx: Transaction = {
       ...tx,
       [field]: field === 'expense' ? Number(String(value).replace(/[^0-9-]/g, '')) || 0 : field === 'itemCount' ? Number(value) || 0 : field === 'isReturn' ? Boolean(value) : String(value || ''),
@@ -694,9 +694,16 @@ export const BuyerWorkdayStatsScreen: React.FC<BuyerWorkdayStatsScreenProps> = R
                     </div>
                   </div>
 
-                  {/* Memo Input */}
+                  {/* Order Remark (Readonly) */}
+                  {order.remark && (
+                    <div className="mb-2 text-xs text-gray-400 break-words whitespace-pre-wrap leading-relaxed">
+                      주문내용: <span className="text-gray-300">{order.remark}</span>
+                    </div>
+                  )}
+
+                  {/* Memo Input (Readonly processingRemark) */}
                   <div className="mb-3">
-                    <div className="w-full bg-gray-800 text-amber-300 border border-gray-700 p-2.5 rounded-lg text-xs sm:text-sm cursor-default select-none min-h-[38px]">{order.remark || '특이사항 없음'}</div>
+                    <div className="w-full bg-gray-800 text-amber-300 border border-gray-700 p-2.5 rounded-lg text-xs sm:text-sm cursor-default select-none min-h-[38px]">{order.processingRemark || '특이사항 없음'}</div>
                   </div>
 
                   {/* Status Buttons (완료 / 미송 / 반품) */}
