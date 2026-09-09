@@ -147,6 +147,13 @@ export function parseFloorAndRoom(text: string): { floor: string; room: string; 
     return { floor: `${flMatch[1]}층`, room: '', matchedText: flMatch[0] };
   }
 
+  // 4. 동만 있는 경우 (예: C동, 가동, 에이동)
+  const dongPattern = /([가-힣A-Za-z]+)\s*동(?:\s|$)/;
+  const dongMatch = text.match(dongPattern);
+  if (dongMatch) {
+    return { floor: `${dongMatch[1]}동`, room: '', matchedText: dongMatch[0].trim() };
+  }
+
   return null;
 }
 
@@ -406,11 +413,18 @@ export function parseSmartOrderText(
 
     // C. 남은 토큰에서 상호 및 비고 분리
     if (remainingTokens.length > 0) {
-      // 항상 첫 번째 남은 단어를 도매 상호로 배정
-      detectedStore = remainingTokens[0];
-      remainingTokens.shift();
-      // 나머지는 비고/주문내용으로 배정
-      detectedRemark = remainingTokens.join(' ');
+      // 건물명과 층(동)이 명확히 있고(예: 신발상가 C동), 호수가 따로 없는 야외/특수 상가인 경우
+      // 남은 텍스트 전체를 상호 대신 '비고'로 넣는 것이 자연스러울 수 있음
+      if (detectedMarket === '신발상가' && detectedFloor.endsWith('동') && !detectedRoom) {
+         detectedStore = '상호 미지정';
+         detectedRemark = remainingTokens.join(' ');
+      } else {
+        // 항상 첫 번째 남은 단어를 도매 상호로 배정
+        detectedStore = remainingTokens[0];
+        remainingTokens.shift();
+        // 나머지는 비고/주문내용으로 배정
+        detectedRemark = remainingTokens.join(' ');
+      }
     }
 
     if (!detectedStore) {
