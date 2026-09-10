@@ -20,6 +20,7 @@ import {
 } from 'firebase/firestore';
 import { getDatabase, ref, set, remove, onValue, get, update, push, query, limitToLast, orderByKey } from 'firebase/database';
 import { User, UserRole, Transaction, CollectionGroupRule, CollectionRecord } from '../types';
+import { saveGroupRules } from './storage';
 
 export const FIREBASE_CONFIG = {
   apiKey: 'AIzaSyCKUn8yVyL9V5NP9rpHWbtcDddiwW1MWSQ',
@@ -640,21 +641,53 @@ export function syncFirebaseGroupRules(onRulesUpdate: (rules: CollectionGroupRul
   return onValue(rulesRef, (snapshot) => {
     const data = snapshot.val() || {};
     const rulesList = Array.isArray(data) ? data : Object.values(data);
-    onRulesUpdate(rulesList.filter(Boolean) as CollectionGroupRule[]);
+    const validRules: CollectionGroupRule[] = (rulesList.filter(Boolean) as any[])
+      .map(r => ({
+        id: String(r.id || `group_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`),
+        storeName: String(r.storeName || '').trim(),
+        groupName: String(r.groupName || '').trim(),
+        matchType: (r.matchType === 'prefix' ? 'prefix' : 'exact') as ('exact' | 'prefix'),
+        effectiveFrom: String(r.effectiveFrom || '').trim(),
+        systemDefault: Boolean(r.systemDefault),
+        createdAt: String(r.createdAt || '')
+      }))
+      .filter(r => r.storeName && r.groupName);
+
+    saveGroupRules(validRules);
+    onRulesUpdate(validRules);
   }, (error) => {
     console.warn('Firebase group rules sync error:', error);
   });
 }
 
 export async function saveGroupRulesToFirebase(rules: CollectionGroupRule[]): Promise<void> {
+  // Always save to localStorage immediately for instant offline/state persistence
+  saveGroupRules(rules);
+
   const rulesRef = ref(rtdb, 'collectionGroupRules');
   try {
+    const sanitizedMap: Record<string, any> = {};
+    rules.forEach((r, idx) => {
+      if (r && (r.storeName || r.groupName)) {
+        const id = r.id || `group_${Date.now()}_${idx}`;
+        sanitizedMap[id] = {
+          id,
+          storeName: String(r.storeName || '').trim(),
+          groupName: String(r.groupName || '').trim(),
+          matchType: r.matchType === 'prefix' ? 'prefix' : 'exact',
+          effectiveFrom: String(r.effectiveFrom || '').trim(),
+          systemDefault: Boolean(r.systemDefault),
+          createdAt: String(r.createdAt || new Date().toISOString())
+        };
+      }
+    });
+
     await Promise.race([
-      set(rulesRef, rules),
+      set(rulesRef, sanitizedMap),
       new Promise((_, reject) => setTimeout(() => reject(new Error('RTDB Timeout')), 10000))
     ]);
   } catch(e) {
-    console.warn('saveGroupRulesToFirebase timeout:', e);
+    console.warn('saveGroupRulesToFirebase timeout or error:', e);
   }
 }
 
@@ -675,6 +708,7 @@ export async function fullSystemReset(): Promise<void> {
     updates['collectionGroupRules'] = null;
     updates['board'] = null;
 
+    saveGroupRules([]);
     await update(ref(rtdb), updates);
   } catch (error) {
     console.error('Full system reset failed:', error);
@@ -684,6 +718,7 @@ export async function fullSystemReset(): Promise<void> {
 
 export async function factoryResetDatabase(): Promise<void> {
   try {
+    saveGroupRules([]);
     await remove(ref(rtdb, 'orders'));
     await remove(ref(rtdb, 'collectionGroupRules'));
   } catch (error) {

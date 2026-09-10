@@ -2,7 +2,7 @@ import React from 'react';
 import { User, UserRole } from '../types';
 import { saveUserToFirebase, deleteUserFromFirebase, sha256, firebaseSendPasswordReset } from '../lib/firebase';
 import { deleteLocalUser } from '../lib/storage';
-import { Shield, UserCheck, Store, Truck, PersonStanding, UserPlus, RefreshCw, X, KeyRound, Trash2, Edit3, Mail } from 'lucide-react';
+import { Shield, UserCheck, Store, Truck, PersonStanding, UserPlus, RefreshCw, X, KeyRound, Trash2, Edit3, Mail, Layers } from 'lucide-react';
 
 interface AdminUserManagementModalProps {
   users: User[];
@@ -10,6 +10,7 @@ interface AdminUserManagementModalProps {
   onClose: () => void;
   onOpenProfile: (username: string) => void;
   onOpenAdminAdd: () => void;
+  onOpenGroupRules?: () => void;
   onUserDeleted?: (username: string) => void;
 }
 
@@ -19,6 +20,7 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
   onClose,
   onOpenProfile,
   onOpenAdminAdd,
+  onOpenGroupRules,
   onUserDeleted
 }) => {
   const [userToDelete, setUserToDelete] = React.useState<User | null>(null);
@@ -181,15 +183,25 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
             총 등록 회원: <span className="text-indigo-600 font-bold">{visibleUsers.length}명</span>
           </div>
           <div className="flex items-center gap-2">
+            {onOpenGroupRules && currentUser?.role === 'admin' && (
+              <button
+                type="button"
+                onClick={onOpenGroupRules}
+                className="px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold transition flex items-center gap-1 shadow-sm"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                대표거래처 묶기 설정
+              </button>
+            )}
             {currentUser?.role === 'admin' && (
-            <button
-              type="button"
-              onClick={onOpenAdminAdd}
-              className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition flex items-center gap-1 shadow-sm"
-            >
-              <UserPlus className="w-3.5 h-3.5" />
-              관리자 추가
-            </button>
+              <button
+                type="button"
+                onClick={onOpenAdminAdd}
+                className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition flex items-center gap-1 shadow-sm"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                관리자 추가
+              </button>
             )}
           </div>
         </div>

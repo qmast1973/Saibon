@@ -1,4 +1,4 @@
-import { User, Transaction, CollectionRecord } from '../types';
+import { User, Transaction, CollectionRecord, CollectionGroupRule } from '../types';
 import { normalizeMarketName } from './firebase';
 
 const DB_NAME = 'WholesaleLedgerDB';
@@ -13,6 +13,7 @@ const AUTO_LOGIN_KEY = 'WHOLESALE_AUTO_LOGIN';
 const AUTO_LOGIN_TIMEOUT = 8 * 60 * 60 * 1000; // 8 hours
 
 export const COLLECTION_STORAGE_KEY = 'SAIPON_COLLECTIONS_V1';
+export const GROUP_RULES_STORAGE_KEY = 'SAIPON_GROUP_RULES_V1';
 
 function openAuthDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -251,5 +252,20 @@ export function loadCollections(): CollectionRecord[] {
 export function saveCollections(records: CollectionRecord[]): void {
   try {
     localStorage.setItem(COLLECTION_STORAGE_KEY, JSON.stringify(records));
+  } catch {}
+}
+
+export function loadGroupRules(): CollectionGroupRule[] {
+  try {
+    const saved = localStorage.getItem(GROUP_RULES_STORAGE_KEY);
+    return saved ? JSON.parse(saved) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveGroupRules(rules: CollectionGroupRule[]): void {
+  try {
+    localStorage.setItem(GROUP_RULES_STORAGE_KEY, JSON.stringify(rules));
   } catch {}
 }

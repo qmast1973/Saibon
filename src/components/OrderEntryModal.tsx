@@ -9,6 +9,7 @@ interface OrderEntryModalProps {
   selectedDate: string;
   stores: string[];
   allMarkets: string[];
+  bundledStores?: string[];
   onClose: () => void;
   onOrderSaved: (savedOrders: Transaction[]) => void;
   onOrderCompleted?: (transactionId: string) => void;
@@ -27,6 +28,7 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
   selectedDate,
   stores,
   allMarkets,
+  bundledStores = [],
   onClose,
   onOrderSaved,
   onOrderCompleted,
@@ -216,20 +218,61 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
               />
             </div>
             <div>
-              <label className="block font-semibold text-gray-200 mb-1">상호 (소매점) *</label>
-              <input
-                type="text"
-                required
-                list="storeDatalist"
-                value={store}
-                disabled={(isRegularBuyer && isEditMode) || (isMerchant && !!currentUser?.storeName)}
-                onChange={(e) => setStore(e.target.value)}
-                placeholder="상호명을 입력하세요"
-                className={`w-full border border-gray-700 rounded-xl p-2.5 bg-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none ${((isRegularBuyer && isEditMode) || (isMerchant && !!currentUser?.storeName)) ? 'bg-gray-950 cursor-not-allowed' : 'focus:bg-gray-900'}`}
-              />
-              <datalist id="storeDatalist">
-                {stores.map(s => <option key={s} value={s} />)}
-              </datalist>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block font-semibold text-gray-200">상호 (소매점) *</label>
+                {isMerchant && bundledStores.length > 1 && (
+                  <span className="text-[10px] text-violet-400 font-bold bg-violet-950/80 px-1.5 py-0.5 rounded border border-violet-800">
+                    대표거래처 묶음 ({bundledStores.length}개 상호)
+                  </span>
+                )}
+              </div>
+              {isMerchant && bundledStores.length > 1 ? (
+                <div className="space-y-1.5">
+                  <select
+                    value={store}
+                    onChange={(e) => setStore(e.target.value)}
+                    className="w-full border border-gray-700 rounded-xl p-2.5 bg-gray-900 text-gray-100 focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-xs"
+                  >
+                    {bundledStores.map(s => (
+                      <option key={s} value={s}>
+                        {s} {s === currentUser?.storeName ? '(대표 상호)' : '(소속 상호)'}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex flex-wrap gap-1">
+                    {bundledStores.map(s => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setStore(s)}
+                        className={`text-[11px] px-2 py-0.5 rounded-lg border transition ${
+                          store === s 
+                            ? 'bg-violet-600 text-white border-violet-500 font-bold' 
+                            : 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700'
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    required
+                    list="storeDatalist"
+                    value={store}
+                    disabled={(isRegularBuyer && isEditMode) || (isMerchant && !!currentUser?.storeName)}
+                    onChange={(e) => setStore(e.target.value)}
+                    placeholder="상호명을 입력하세요"
+                    className={`w-full border border-gray-700 rounded-xl p-2.5 bg-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none ${((isRegularBuyer && isEditMode) || (isMerchant && !!currentUser?.storeName)) ? 'bg-gray-950 cursor-not-allowed' : 'focus:bg-gray-900'}`}
+                  />
+                  <datalist id="storeDatalist">
+                    {stores.map(s => <option key={s} value={s} />)}
+                  </datalist>
+                </>
+              )}
             </div>
           </div>
 

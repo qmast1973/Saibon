@@ -4,7 +4,8 @@ import { User, Transaction, CollectionRecord, CollectionGroupRule } from './type
 import {
   syncFirebaseUsers,
   syncFirebaseOrders,
-    deleteOrderFromFirebase,
+  syncFirebaseGroupRules,
+  deleteOrderFromFirebase,
   saveOrderToFirebase,
   firebaseSignOutUser,
   getBusinessDate,
@@ -30,7 +31,9 @@ import {
   updateTransactionInIndexedDB,
   loadTransactionsFromIndexedDB,
   loadCollections,
-  saveCollections
+  saveCollections,
+  loadGroupRules,
+  saveGroupRules
 } from './lib/storage';
 
 import { Navbar } from './components/Navbar';
@@ -52,7 +55,7 @@ const LocalMerchantInfoModal = lazy(() => import('./components/LocalMerchantInfo
 const DataManagementModal = lazy(() => import('./components/DataManagementModal').then(module => ({ default: module.DataManagementModal })));
 const BuildingManagerModal = lazy(() => import('./components/BuildingManagerModal').then(module => ({ default: module.BuildingManagerModal })));
 
-import { Search } from 'lucide-react';
+import { Search, Layers } from 'lucide-react';
 
 export default function App() {
   // Global Data State
@@ -91,7 +94,7 @@ export default function App() {
 
 
   const [collections, setCollections] = useState<CollectionRecord[]>([]);
-  const [collectionGroupRules, setCollectionGroupRules] = useState<CollectionGroupRule[]>([]);
+  const [collectionGroupRules, setCollectionGroupRules] = useState<CollectionGroupRule[]>(() => loadGroupRules());
   const [showCollectionScreen, setShowCollectionScreen] = useState(false);
   const [showGroupRulesModal, setShowGroupRulesModal] = useState(false);
 
@@ -177,6 +180,11 @@ export default function App() {
 
         if (cachedCollections.length > 0) {
         }
+
+        const cachedGroupRules = loadGroupRules();
+        if (cachedGroupRules.length > 0) {
+          setCollectionGroupRules(cachedGroupRules);
+        }
       } catch (e) {
         console.warn('Init error:', e);
       }
@@ -258,11 +266,17 @@ export default function App() {
       saveTransactionsToIndexedDB(firebaseOrders);
     });
 
+    const unsubGroupRules = syncFirebaseGroupRules((firebaseRules) => {
+      if (firebaseRules) {
+        setCollectionGroupRules(firebaseRules);
+      }
+    });
 
     return () => {
       unsubUsers();
       unsubOrders();
-          };
+      unsubGroupRules();
+    };
   }, [currentUser?.username, setCleanTransactions]);
 
   // Handle Login & Logout
@@ -315,10 +329,54 @@ export default function App() {
       );
     }
 
+    const isMerchant = currentUser?.role === 'merchant';
+    const merchantStore = (isMerchant ? (currentUser.storeName || currentUser.name || '') : '');
+    const merchantUsername = currentUser?.username || '';
+    
+    const normalizeStore = (s: string) => String(s || '').replace(/\s+/g, '').toLowerCase();
+    const normMerchantStore = normalizeStore(merchantStore);
+
     return transactions.filter(t => {
-      if (currentUser?.role === 'merchant') {
-        const isOwner = t.merchantId === currentUser.username || t.store === currentUser.storeName;
-        if (!isOwner) return false;
+      if (isMerchant) {
+        // 1. Direct owner match
+        if (t.merchantId && t.merchantId === merchantUsername) return true;
+        
+        const normTStore = normalizeStore(t.store);
+        if (normMerchantStore && normTStore && (normTStore === normMerchantStore || normTStore.includes(normMerchantStore) || normMerchantStore.includes(normTStore))) return true;
+
+        // 2. Representative store grouping match
+        if (normMerchantStore && normTStore && collectionGroupRules && collectionGroupRules.length > 0) {
+          const tDate = t.date || t.businessDate || '';
+          
+          const isGrouped = collectionGroupRules.some(rule => {
+            const rGroup = normalizeStore(rule.groupName);
+            const rStore = normalizeStore(rule.storeName);
+            
+            // Check effective date if specified (Temporarily bypassed to allow all past orders to merge)
+            // if (rule.effectiveFrom && tDate && tDate < rule.effectiveFrom) {
+            //   return false;
+            // }
+
+            // A: Current logged in user is the Representative Store (groupName)
+            if (rGroup === normMerchantStore || rGroup.includes(normMerchantStore) || normMerchantStore.includes(rGroup)) {
+              if (rule.matchType === 'prefix') {
+                return normTStore.startsWith(rStore) || rStore.startsWith(normTStore);
+              }
+              return normTStore === rStore || normTStore.includes(rStore) || rStore.includes(normTStore);
+            }
+
+            // B: Current logged in user is the member store (storeName)
+            if (rStore === normMerchantStore || rStore.includes(normMerchantStore) || normMerchantStore.includes(rStore)) {
+              return normTStore === rGroup || normTStore.includes(rGroup) || rGroup.includes(normTStore);
+            }
+
+            return false;
+          });
+
+          if (isGrouped) return true;
+        }
+
+        return false;
       }
 
       if (currentUser?.role === 'buyer') {
@@ -336,7 +394,7 @@ export default function App() {
 
       return true;
     });
-  }, [transactions, currentUser, users]);
+  }, [transactions, currentUser, users, collectionGroupRules]);
 
 
   // Memoized distinct values for dropdowns & filters
@@ -357,16 +415,73 @@ export default function App() {
     ...roleFilteredTransactions.map(t => t.manager)
   ])].filter(Boolean) as string[]).sort((a, b) => a.localeCompare(b, 'ko')), [users, roleFilteredTransactions]);
 
-  // Memoized Filtering Logic (Search Only)
-  const filteredTransactions = useMemo(() => {
-    const q = deferredSearchQuery.trim().toLowerCase();
-    if (!q) return roleFilteredTransactions;
+  // Bundled stores list for the logged-in merchant (representative store + member stores)
+  const merchantBundledStores: string[] = useMemo(() => {
+    if (currentUser?.role !== 'merchant') return [];
+    const myStore = (currentUser.storeName || currentUser.name || '').trim();
+    if (!myStore) return [];
 
-    return roleFilteredTransactions.filter(t => {
+    const storeSet = new Set<string>([myStore]);
+    const normalizeStore = (s: string) => String(s || '').replace(/\s+/g, '').toLowerCase();
+    const normMyStore = normalizeStore(myStore);
+
+    (collectionGroupRules || []).forEach(rule => {
+      const rGroup = normalizeStore(rule.groupName);
+      const rStore = normalizeStore(rule.storeName);
+
+      // If current merchant is the representative store
+      if (rGroup === normMyStore || rGroup.includes(normMyStore) || normMyStore.includes(rGroup)) {
+        if (rule.matchType === 'prefix') {
+          transactions.forEach(t => {
+            const normTStore = normalizeStore(t.store);
+            if (normTStore && (normTStore.startsWith(rStore) || rStore.startsWith(normTStore))) {
+              storeSet.add(t.store.trim()); // add original to show correctly in UI
+            }
+          });
+          storeSet.add(rule.storeName.trim()); // fallback
+        } else {
+          storeSet.add(rule.storeName.trim());
+        }
+      }
+      // If current merchant is a member store
+      else if (rStore === normMyStore || rStore.includes(normMyStore) || normMyStore.includes(rStore)) {
+        storeSet.add(rule.groupName.trim());
+      }
+    });
+
+    return [...storeSet].sort((a, b) => a.localeCompare(b, 'ko'));
+  }, [currentUser, collectionGroupRules, transactions]);
+
+  // Merchant branch quick filter state ('all' or specific storeName)
+  const [merchantStoreFilter, setMerchantStoreFilter] = useState<string>('all');
+
+  // Reset merchantStoreFilter if user logs out or changes
+  useEffect(() => {
+    setMerchantStoreFilter('all');
+  }, [currentUser?.username]);
+
+  // Memoized Filtering Logic (Search + Merchant Branch Filter)
+  const filteredTransactions = useMemo(() => {
+    let result = roleFilteredTransactions;
+
+    // Apply merchant branch filter if selected
+    if (currentUser?.role === 'merchant' && merchantStoreFilter !== 'all') {
+      const normalizeStore = (s: string) => String(s || '').replace(/\s+/g, '').toLowerCase();
+      const normFilter = normalizeStore(merchantStoreFilter);
+      result = result.filter(t => {
+        const normTStore = normalizeStore(t.store);
+        return normTStore === normFilter || normTStore.includes(normFilter) || normFilter.includes(normTStore);
+      });
+    }
+
+    const q = deferredSearchQuery.trim().toLowerCase();
+    if (!q) return result;
+
+    return result.filter(t => {
       const combined = `${t.store} ${t.manager} ${t.market} ${t.region} ${t.status} ${t.remark}`.toLowerCase();
       return combined.includes(q);
     });
-  }, [roleFilteredTransactions, deferredSearchQuery]);
+  }, [roleFilteredTransactions, deferredSearchQuery, currentUser?.role, merchantStoreFilter]);
 
   // Month navigation
   const handleChangeMonth = useCallback((delta: number) => {
@@ -780,7 +895,7 @@ export default function App() {
       <Navbar
         currentUser={currentUser}
         onOpenDataManagement={() => setShowDataManagementModal(true)}
-          onOpenBuildingManagement={() => setShowBuildingManagerModal(true)}
+        onOpenBuildingManagement={() => setShowBuildingManagerModal(true)}
         onOpenProfile={() => {
           setProfileTargetUsername(currentUser.username);
           setShowProfileModal(true);
@@ -801,12 +916,74 @@ export default function App() {
           setShowBuyerWorkdayScreen(true);
         }}
         onOpenAdminManagement={() => setShowAdminUserManagementModal(true)}
+        onOpenGroupRules={() => setShowGroupRulesModal(true)}
         onOpenBoard={() => setShowBoardScreen(true)}
         onLogout={handleLogout}
       />
 
       {/* Main Content Area */}
       <main className="max-w-7xl w-full mx-auto p-3 flex-1 flex flex-col gap-3">
+        {/* Bundled Stores Branch Selector for Representative Merchant */}
+        {currentUser?.role === 'merchant' && merchantBundledStores.length > 1 && (
+          <section className="bg-gradient-to-r from-violet-950/70 to-indigo-950/70 border border-violet-800/60 rounded-2xl p-3 sm:p-3.5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-violet-800/80 border border-violet-600 flex items-center justify-center text-violet-200 shrink-0">
+                <Layers className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-bold text-gray-100 text-sm">대표거래처 통합 주문</span>
+                  <span className="bg-violet-900 text-violet-200 border border-violet-700 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                    {merchantBundledStores.length}개 상호 묶음
+                  </span>
+                </div>
+                <p className="text-[11px] text-gray-400 mt-0.5">
+                  대표거래처로 묶인 모든 상호의 주문이 나열됩니다. 상호별 버튼을 눌러 개별 조회도 가능합니다.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setMerchantStoreFilter('all')}
+                className={`px-3 py-1.5 rounded-xl font-bold transition text-xs flex items-center gap-1.5 shadow-xs ${
+                  merchantStoreFilter === 'all'
+                    ? 'bg-violet-600 text-white ring-2 ring-violet-400 font-black'
+                    : 'bg-gray-900 text-gray-300 border border-gray-700 hover:bg-gray-800'
+                }`}
+              >
+                <span>전체 묶음 주문</span>
+                <span className="text-[10px] opacity-80">({merchantBundledStores.length})</span>
+              </button>
+
+              {merchantBundledStores.map(st => {
+                const isRep = st.toLowerCase() === (currentUser.storeName || '').trim().toLowerCase();
+                const isSelected = merchantStoreFilter.toLowerCase() === st.toLowerCase();
+                return (
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => setMerchantStoreFilter(st)}
+                    className={`px-3 py-1.5 rounded-xl font-bold transition text-xs flex items-center gap-1.5 ${
+                      isSelected
+                        ? 'bg-violet-600 text-white ring-2 ring-violet-400 shadow-xs'
+                        : 'bg-gray-900 text-gray-300 border border-gray-700 hover:bg-gray-800'
+                    }`}
+                  >
+                    <span>{st}</span>
+                    {isRep ? (
+                      <span className="text-[9px] bg-violet-900 text-violet-200 border border-violet-700 px-1 py-0.2 rounded font-semibold">대표</span>
+                    ) : (
+                      <span className="text-[9px] bg-gray-800 text-gray-400 border border-gray-700 px-1 py-0.2 rounded">소속</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
         {/* Search Bar */}
         <section className="bg-gray-900 p-2 sm:p-2.5 rounded-2xl shadow-xs border border-gray-800 flex items-center justify-between gap-2.5 text-xs">
           <div className="relative flex-1 max-w-md">
@@ -873,6 +1050,7 @@ export default function App() {
             setShowProfileModal(true);
           }}
           onOpenAdminAdd={() => setShowAdminAddModal(true)}
+          onOpenGroupRules={() => setShowGroupRulesModal(true)}
           onUserDeleted={(username) => {
             setUsers(prev => prev.filter(u => u.username !== username));
           }}
@@ -931,6 +1109,8 @@ export default function App() {
           rules={collectionGroupRules}
           currentUser={currentUser}
           currentDateStr={selectedDateStr}
+          availableStores={stores}
+          merchantUsers={users.filter(u => u.role === 'merchant')}
           onClose={() => setShowGroupRulesModal(false)}
           onRulesUpdated={setCollectionGroupRules}
         />
@@ -960,6 +1140,7 @@ export default function App() {
           }}
           stores={stores}
           allMarkets={currentUser?.role === 'buyer' && !currentUser.isBuyerAdmin ? (currentUser.allowedMarkets || []).map(normalizeMarketName) : allMarkets}
+          bundledStores={merchantBundledStores}
           onClose={() => {
             setShowOrderModal(false);
             setEditingTransaction(null);

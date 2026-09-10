@@ -1,7 +1,7 @@
 import React from 'react';
 import { User } from '../types';
 import { PWAInstallButton } from './PWAInstallButton';
-import { Database, Calculator, Store, LogOut, Users, HandCoins, MessageSquare } from 'lucide-react';
+import { Database, Calculator, Store, LogOut, Users, HandCoins, MessageSquare, Layers } from 'lucide-react';
 
 interface NavbarProps {
   currentUser: User | null;
@@ -11,6 +11,7 @@ interface NavbarProps {
   onOpenCollectionScreen: () => void;
   onOpenBuyerWorkday?: () => void;
   onOpenAdminManagement: () => void;
+  onOpenGroupRules?: () => void;
   onOpenBoard?: () => void;
   onLogout: () => void;
 }
@@ -23,6 +24,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenCollectionScreen,
   onOpenBuyerWorkday,
   onOpenAdminManagement,
+  onOpenGroupRules,
   onOpenBoard,
   onLogout
 }) => {
@@ -164,6 +166,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                 >
                   <HandCoins className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   <span>수금관리</span>
+                </button>
+              )}
+
+              {hasAdminAccess && onOpenGroupRules && (
+                <button
+                  type="button"
+                  onClick={onOpenGroupRules}
+                  className="bg-violet-700 hover:bg-violet-600 px-2 sm:px-2.5 py-1 rounded-xl text-[11px] sm:text-xs font-bold transition flex items-center gap-1 shadow-xs"
+                  title="대표거래처 묶기 관리"
+                >
+                  <Layers className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                  <span>대표거래처</span>
                 </button>
               )}
 
