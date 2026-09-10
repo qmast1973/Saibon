@@ -937,9 +937,19 @@ export default function App() {
                     {merchantBundledStores.length}개 상호 묶음
                   </span>
                 </div>
-                <p className="text-[11px] text-gray-400 mt-0.5">
-                  대표거래처로 묶인 모든 상호의 주문이 나열됩니다. 상호별 버튼을 눌러 개별 조회도 가능합니다.
-                </p>
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  <p className="text-[11px] text-gray-400">
+                    대표거래처로 묶인 모든 상호의 주문이 나열됩니다. 상호별 버튼을 눌러 개별 조회도 가능합니다.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowGroupRulesModal(true)}
+                    className="px-2 py-0.5 rounded-lg bg-violet-800/80 hover:bg-violet-700 text-violet-200 border border-violet-600 text-[10px] font-bold transition flex items-center gap-1 cursor-pointer"
+                  >
+                    <Layers className="w-3 h-3" />
+                    <span>대표거래처 하위 매핑 관리 열기</span>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1111,6 +1121,7 @@ export default function App() {
           currentDateStr={selectedDateStr}
           availableStores={stores}
           merchantUsers={users.filter(u => u.role === 'merchant')}
+          transactions={transactions}
           onClose={() => setShowGroupRulesModal(false)}
           onRulesUpdated={setCollectionGroupRules}
         />

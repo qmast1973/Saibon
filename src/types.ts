@@ -79,6 +79,7 @@ export interface CollectionGroupRule {
   effectiveFrom: string; // YYYY-MM-DD
   systemDefault?: boolean;
   createdAt?: string;
+  note?: string; // 비고 및 특이사항
 }
 
 export interface BoardComment {

@@ -169,15 +169,15 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </button>
               )}
 
-              {hasAdminAccess && onOpenGroupRules && (
+              {onOpenGroupRules && (
                 <button
                   type="button"
                   onClick={onOpenGroupRules}
-                  className="bg-violet-700 hover:bg-violet-600 px-2 sm:px-2.5 py-1 rounded-xl text-[11px] sm:text-xs font-bold transition flex items-center gap-1 shadow-xs"
-                  title="대표거래처 묶기 관리"
+                  className="bg-violet-600 hover:bg-violet-500 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs sm:text-xs font-black transition flex items-center gap-1.5 shadow-md ring-2 ring-violet-400/70 hover:ring-violet-300 text-white active:scale-95 cursor-pointer"
+                  title="대표거래처 묶기 관리 (종속 거래처 목록 조회/수정/삭제)"
                 >
-                  <Layers className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                  <span>대표거래처</span>
+                  <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-200" />
+                  <span>대표거래처 관리</span>
                 </button>
               )}
 

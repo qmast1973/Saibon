@@ -64,5 +64,12 @@ service cloud.firestore {
                     && isValidMarketSettings(incoming())
                     && incoming().diff(existing()).affectedKeys().hasAny(['list', 'updatedAt']);
     }
+
+    match /collectionGroupRules/{ruleId} {
+      allow read: if true;
+      allow write: if true;
+      allow get, list: if true;
+      allow create, update, delete: if true;
+    }
   }
 }

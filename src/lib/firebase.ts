@@ -16,7 +16,9 @@ import {
   getDoc,
   collection,
   onSnapshot,
-  deleteDoc
+  deleteDoc,
+  getDocs,
+  writeBatch
 } from 'firebase/firestore';
 import { getDatabase, ref, set, remove, onValue, get, update, push, query, limitToLast, orderByKey } from 'firebase/database';
 import { User, UserRole, Transaction, CollectionGroupRule, CollectionRecord } from '../types';
@@ -637,57 +639,194 @@ export async function deleteOrderFromFirebase(t: Transaction): Promise<void> {
 // ----------------- GROUP RULES FIREBASE SYNC -----------------
 
 export function syncFirebaseGroupRules(onRulesUpdate: (rules: CollectionGroupRule[]) => void) {
-  const rulesRef = ref(rtdb, 'collectionGroupRules');
-  return onValue(rulesRef, (snapshot) => {
-    const data = snapshot.val() || {};
-    const rulesList = Array.isArray(data) ? data : Object.values(data);
-    const validRules: CollectionGroupRule[] = (rulesList.filter(Boolean) as any[])
-      .map(r => ({
-        id: String(r.id || `group_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`),
-        storeName: String(r.storeName || '').trim(),
-        groupName: String(r.groupName || '').trim(),
-        matchType: (r.matchType === 'prefix' ? 'prefix' : 'exact') as ('exact' | 'prefix'),
-        effectiveFrom: String(r.effectiveFrom || '').trim(),
-        systemDefault: Boolean(r.systemDefault),
-        createdAt: String(r.createdAt || '')
-      }))
-      .filter(r => r.storeName && r.groupName);
+  // 1. Firestore listener
+  const q = collection(firestore, 'collectionGroupRules');
+  const unsubFirestore = onSnapshot(q, (snapshot) => {
+    const validRules: CollectionGroupRule[] = [];
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      if (data && (data.storeName || data.groupName)) {
+        validRules.push({
+          id: String(data.id || docSnap.id),
+          storeName: String(data.storeName || '').trim(),
+          groupName: String(data.groupName || '').trim(),
+          matchType: (data.matchType === 'prefix' ? 'prefix' : 'exact') as ('exact' | 'prefix'),
+          effectiveFrom: String(data.effectiveFrom || '').trim(),
+          systemDefault: Boolean(data.systemDefault),
+          createdAt: String(data.createdAt || ''),
+          note: String(data.note || '').trim()
+        });
+      }
+    });
 
     saveGroupRules(validRules);
     onRulesUpdate(validRules);
   }, (error) => {
     console.warn('Firebase group rules sync error:', error);
   });
+
+  // 2. RTDB backup listener
+  const rtdbRef = ref(rtdb, 'collectionGroupRules');
+  const unsubRTDB = onValue(rtdbRef, (snapshot) => {
+    const val = snapshot.val();
+    if (val && Array.isArray(val)) {
+      const validRules: CollectionGroupRule[] = val
+        .filter((r: any) => r && (r.storeName || r.groupName))
+        .map((r: any) => ({
+          id: String(r.id),
+          storeName: String(r.storeName || '').trim(),
+          groupName: String(r.groupName || '').trim(),
+          matchType: (r.matchType === 'prefix' ? 'prefix' : 'exact') as ('exact' | 'prefix'),
+          effectiveFrom: String(r.effectiveFrom || '').trim(),
+          systemDefault: Boolean(r.systemDefault),
+          createdAt: String(r.createdAt || ''),
+          note: String(r.note || '').trim()
+        }));
+
+      saveGroupRules(validRules);
+      onRulesUpdate(validRules);
+    }
+  }, (err) => {
+    console.warn('Firebase RTDB group rules sync error:', err);
+  });
+
+  return () => {
+    unsubFirestore();
+    unsubRTDB();
+  };
+}
+
+export async function deleteGroupRuleFromFirebase(ruleId: string, updatedRules: CollectionGroupRule[], storeNameToDelete?: string): Promise<void> {
+  // Always save to localStorage immediately
+  saveGroupRules(updatedRules);
+
+  const cleanList = updatedRules.map((r, idx) => ({
+    id: String(r.id || `group_${Date.now()}_${idx}`),
+    storeName: String(r.storeName || '').trim(),
+    groupName: String(r.groupName || '').trim(),
+    matchType: (r.matchType === 'prefix' ? 'prefix' : 'exact') as ('exact' | 'prefix'),
+    effectiveFrom: String(r.effectiveFrom || '').trim(),
+    systemDefault: Boolean(r.systemDefault),
+    createdAt: String(r.createdAt || new Date().toISOString()),
+    note: String(r.note || '').trim()
+  }));
+
+  // 1. RTDB backup sync
+  try {
+    await set(ref(rtdb, 'collectionGroupRules'), cleanList);
+  } catch (rtdbErr) {
+    console.warn('RTDB deleteGroupRule error:', rtdbErr);
+  }
+
+  // 2. Firestore direct delete
+  try {
+    const docRef = doc(firestore, 'collectionGroupRules', ruleId);
+    await deleteDoc(docRef);
+
+    // If storeNameToDelete is provided, ensure any duplicate or legacy doc for this store is also removed
+    if (storeNameToDelete) {
+      try {
+        const snap = await getDocs(collection(firestore, 'collectionGroupRules'));
+        const batch = writeBatch(firestore);
+        let batchCount = 0;
+        snap.forEach((d) => {
+          const dData = d.data();
+          if (d.id === ruleId || (dData.storeName && dData.storeName.trim().toLowerCase() === storeNameToDelete.trim().toLowerCase())) {
+            batch.delete(d.ref);
+            batchCount++;
+          }
+        });
+        if (batchCount > 0) {
+          await batch.commit();
+        }
+      } catch (cleanErr) {
+        console.warn('Additional store cleanup error (non-fatal):', cleanErr);
+      }
+    }
+  } catch (firestoreErr: any) {
+    console.error('Firestore deleteDoc error:', firestoreErr);
+    throw new Error(`Firestore 삭제 실패: ${firestoreErr?.message || firestoreErr}`);
+  }
 }
 
 export async function saveGroupRulesToFirebase(rules: CollectionGroupRule[]): Promise<void> {
   // Always save to localStorage immediately for instant offline/state persistence
   saveGroupRules(rules);
 
-  const rulesRef = ref(rtdb, 'collectionGroupRules');
+  const cleanList = rules.map((r, idx) => ({
+    id: String(r.id || `group_${Date.now()}_${idx}`),
+    storeName: String(r.storeName || '').trim(),
+    groupName: String(r.groupName || '').trim(),
+    matchType: (r.matchType === 'prefix' ? 'prefix' : 'exact') as ('exact' | 'prefix'),
+    effectiveFrom: String(r.effectiveFrom || '').trim(),
+    systemDefault: Boolean(r.systemDefault),
+    createdAt: String(r.createdAt || new Date().toISOString()),
+    note: String(r.note || '').trim()
+  }));
+
+  let rtdbError: Error | null = null;
+  let firestoreError: Error | null = null;
+
+  // 1. RTDB backup sync (zero-permission real-time replication)
   try {
-    const sanitizedMap: Record<string, any> = {};
-    rules.forEach((r, idx) => {
+    await set(ref(rtdb, 'collectionGroupRules'), cleanList);
+  } catch (rtdbErr: any) {
+    console.warn('RTDB saveGroupRules error:', rtdbErr);
+    rtdbError = rtdbErr;
+  }
+
+  // 2. Firestore sync
+  try {
+    const rulesCollection = collection(firestore, 'collectionGroupRules');
+    const batchOps = writeBatch(firestore);
+
+    // Get existing rules to delete the ones that are missing
+    try {
+      const snapshot = await Promise.race([
+        getDocs(rulesCollection),
+        new Promise<null>((_, reject) => setTimeout(() => reject(new Error('Firestore getDocs timeout (5s)')), 5000))
+      ]);
+      if (snapshot && 'docs' in snapshot) {
+        const existingIds = new Set(snapshot.docs.map(doc => doc.id));
+        const newIds = new Set(cleanList.map(r => r.id));
+        existingIds.forEach(id => {
+          if (!newIds.has(id)) {
+            batchOps.delete(doc(firestore, 'collectionGroupRules', id));
+          }
+        });
+      }
+    } catch (fetchErr) {
+      console.warn('Failed to fetch existing rules for deletion, proceeding with upsert:', fetchErr);
+    }
+
+    // Set/Update all rules
+    cleanList.forEach((r) => {
       if (r && (r.storeName || r.groupName)) {
-        const id = r.id || `group_${Date.now()}_${idx}`;
-        sanitizedMap[id] = {
-          id,
-          storeName: String(r.storeName || '').trim(),
-          groupName: String(r.groupName || '').trim(),
-          matchType: r.matchType === 'prefix' ? 'prefix' : 'exact',
-          effectiveFrom: String(r.effectiveFrom || '').trim(),
-          systemDefault: Boolean(r.systemDefault),
-          createdAt: String(r.createdAt || new Date().toISOString())
-        };
+        const docRef = doc(firestore, 'collectionGroupRules', r.id);
+        batchOps.set(docRef, {
+          id: r.id,
+          storeName: r.storeName,
+          groupName: r.groupName,
+          matchType: r.matchType,
+          effectiveFrom: r.effectiveFrom,
+          systemDefault: r.systemDefault,
+          createdAt: r.createdAt,
+          note: r.note
+        });
       }
     });
 
-    await Promise.race([
-      set(rulesRef, sanitizedMap),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('RTDB Timeout')), 10000))
-    ]);
-  } catch(e) {
-    console.warn('saveGroupRulesToFirebase timeout or error:', e);
+    await batchOps.commit();
+  } catch(e: any) {
+    console.error('saveGroupRulesToFirebase Firestore error:', e);
+    firestoreError = e;
+  }
+
+  // If both failed or Firestore failed, throw error to caller to alert user
+  if (firestoreError && rtdbError) {
+    throw new Error(`DB 저장 실패: Firestore (${firestoreError.message}), RTDB (${rtdbError.message})`);
+  } else if (firestoreError) {
+    throw firestoreError;
   }
 }
 
