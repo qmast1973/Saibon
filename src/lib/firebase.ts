@@ -658,6 +658,30 @@ export async function saveGroupRulesToFirebase(rules: CollectionGroupRule[]): Pr
   }
 }
 
+
+export async function fullSystemReset(): Promise<void> {
+  try {
+    const snapshot = await get(ref(rtdb, 'users'));
+    const data = snapshot.val() || {};
+    
+    const updates: any = {};
+    for (const [key, user] of Object.entries(data)) {
+      if ((user as User).role !== 'admin') {
+         updates[`users/${key}`] = null;
+      }
+    }
+    
+    updates['orders'] = null;
+    updates['collectionGroupRules'] = null;
+    updates['board'] = null;
+
+    await update(ref(rtdb), updates);
+  } catch (error) {
+    console.error('Full system reset failed:', error);
+    throw error;
+  }
+}
+
 export async function factoryResetDatabase(): Promise<void> {
   try {
     await remove(ref(rtdb, 'orders'));

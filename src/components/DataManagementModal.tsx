@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { User, Transaction } from '../types';
 import { Trash2, AlertTriangle, CheckCircle2, X, Database, Loader2, Layers, FileSpreadsheet, Download, Upload } from 'lucide-react';
-import { factoryResetDatabase, deleteOrderFromFirebase } from '../lib/firebase';
+import { factoryResetDatabase, fullSystemReset, deleteOrderFromFirebase } from '../lib/firebase';
 import { saveTransactionsToIndexedDB, saveCollections } from '../lib/storage';
 
 interface DataManagementModalProps {
@@ -29,11 +29,37 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [confirmStep, setConfirmStep] = useState<'idle' | 'confirm_factory_reset'>('idle');
+  const [confirmStep, setConfirmStep] = useState<'idle' | 'confirm_factory_reset' | 'confirm_full_reset'>('idle');
 
   const isAdmin = currentUser?.role === 'admin';
   const isSubAdmin = currentUser?.role === 'buyer' && currentUser?.isBuyerAdmin;
   const hasAdminAccess = isAdmin || isSubAdmin;
+
+  
+  const handleFullReset = async () => {
+    setLoading(true);
+    setStatusMessage(null);
+    try {
+      await fullSystemReset();
+      localStorage.setItem('SAIPON_DATA_INITIALIZED', 'true');
+      await saveTransactionsToIndexedDB([]);
+      saveCollections([]);
+      onResetComplete();
+      setStatusMessage({
+        type: 'success',
+        text: '모든 데이터 및 회원이 초기화되었습니다. (관리자 계정 유지)'
+      });
+      setConfirmStep('idle');
+    } catch (err: any) {
+      console.error('전체 초기화 실패:', err);
+      setStatusMessage({
+        type: 'error',
+        text: `전체 초기화 중 오류가 발생했습니다: ${err.message || '네트워크 상태를 확인해주세요.'}`
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleFactoryReset = async () => {
     setLoading(true);
@@ -192,42 +218,43 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
 
           {isAdmin && (
             <>
-          {/* Option 1: Factory Reset for Real Usage */}
-          <div className="bg-red-950/20 border border-red-900/60 rounded-xl p-4 space-y-3">
+                    <div className="bg-red-950/20 border border-red-900/60 rounded-xl p-4 space-y-3 mb-4">
             <div className="flex items-start gap-3">
               <div className="w-8 h-8 rounded-lg bg-red-900/50 flex items-center justify-center text-red-300 shrink-0 mt-0.5">
                 <Trash2 className="w-4 h-4" />
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-bold text-red-200">실사용 공장 초기화 (빈 데이터로 시작)</h3>
+                  <h3 className="text-sm font-bold text-red-200">시스템 전체 초기화 (회원 포함 완전 삭제)</h3>
                   <span className="text-[10px] bg-red-800/80 text-red-100 px-2 py-0.5 rounded-full font-bold">추천</span>
                 </div>
                 <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                  테스트용 샘플 데이터 및 기존 주문/수금 내역을 <strong className="text-red-300">모두 영구 삭제</strong>하고 실제 장부를 등록할 수 있는 깨끗한 빈 상태로 만듭니다. (회원 계정은 유지됩니다)
+                  장부, 수금 내역은 물론 <strong className="text-red-300">관리자를 제외한 모든 가입 회원(사입삼촌, 상인 등) 정보까지 영구 삭제</strong>합니다. 빈 상태에서 다시 시작할 때만 사용하세요.
                 </p>
               </div>
             </div>
-            {confirmStep !== 'confirm_factory_reset' ? (
+            
+            {confirmStep !== 'confirm_full_reset' ? (
               <button
                 type="button"
                 disabled={loading}
-                onClick={() => setConfirmStep('confirm_factory_reset')}
+                onClick={() => setConfirmStep('confirm_full_reset')}
                 className="w-full mt-2 py-2.5 px-4 bg-red-600 hover:bg-red-500 active:bg-red-700 text-white text-xs font-bold rounded-xl transition shadow-lg shadow-red-950/50 flex items-center justify-center gap-2"
               >
                 <Trash2 className="w-4 h-4" />
-                <span>데이터 전체 비우기</span>
+                <span>데이터 및 일반회원 전체 삭제</span>
               </button>
             ) : (
               <div className="mt-2 p-3 bg-red-950/50 border border-red-800/80 rounded-xl">
                 <p className="text-xs text-red-300 font-bold mb-2.5 flex items-center justify-center gap-1.5">
                   <AlertTriangle className="w-4 h-4" />
-                  정말 모든 데이터를 삭제하시겠습니까?
+                  정말 모든 회원과 데이터를 삭제하시겠습니까? 복구 불가합니다.
                 </p>
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => setConfirmStep('idle')}
+                    disabled={loading}
                     className="flex-1 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold rounded-lg transition"
                   >
                     취소
@@ -235,16 +262,15 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
                   <button
                     type="button"
                     disabled={loading}
-                    onClick={handleFactoryReset}
+                    onClick={handleFullReset}
                     className="flex-1 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-lg transition flex items-center justify-center gap-2"
                   >
-                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>네, 삭제합니다</span>}
+                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>네, 모두 삭제합니다</span>}
                   </button>
                 </div>
               </div>
             )}
           </div>
-
           <div className="bg-amber-950/20 border border-amber-900/60 rounded-xl p-4 space-y-2.5">
             <div className="flex items-start gap-3">
               <div className="w-8 h-8 rounded-lg bg-amber-900/50 flex items-center justify-center text-amber-300 shrink-0 mt-0.5">
