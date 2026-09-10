@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
-import { Transaction, User } from '../types';
+import { Transaction, User, CollectionGroupRule } from '../types';
 import {
   normalizeMarketName,
   normalizeFloorValue,
@@ -9,6 +9,7 @@ import {
   rtdb,
   formatMoney
 } from '../lib/firebase';
+import { matchesTransactionWithGroup, getCollectionBillingStore } from '../lib/groupRules';
 import {
   Building2,
   Calendar,
@@ -30,6 +31,7 @@ import {
 interface BuyerWorkdayScreenProps {
   currentUser: User;
   transactions: Transaction[];
+  collectionGroupRules?: CollectionGroupRule[];
   selectedDateStr: string;
   onSelectDateStr: (date: string) => void;
   onLogout: () => void;
@@ -42,6 +44,7 @@ interface BuyerWorkdayScreenProps {
 export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(({
   currentUser,
   transactions,
+  collectionGroupRules = [],
   selectedDateStr,
   onSelectDateStr,
   onLogout,
@@ -140,11 +143,7 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(
     }
 
     if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase();
-      list = list.filter(item => {
-        const combined = `${item.store} ${item.room} ${item.manager} ${item.remark} ${item.market}`.toLowerCase();
-        return combined.includes(q);
-      });
+      list = list.filter(item => matchesTransactionWithGroup(item, searchQuery, collectionGroupRules || []));
     }
 
     return list.sort((a, b) => {
@@ -160,7 +159,7 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(
       const rB = String(b.room || '');
       return rA.localeCompare(rB, 'ko', { numeric: true });
     });
-  }, [dateOrders, selectedBuilding, selectedFloor, statusFilter, searchQuery]);
+  }, [dateOrders, selectedBuilding, selectedFloor, statusFilter, searchQuery, collectionGroupRules]);
 
   // Create scopeOrders that ignores statusFilter for top stats, but includes searchQuery
   const scopeOrders = useMemo(() => {
@@ -178,15 +177,11 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(
     }
 
     if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase();
-      list = list.filter(item => {
-        const combined = `${item.store} ${item.room} ${item.manager} ${item.remark} ${item.market}`.toLowerCase();
-        return combined.includes(q);
-      });
+      list = list.filter(item => matchesTransactionWithGroup(item, searchQuery, collectionGroupRules || []));
     }
     
     return list;
-  }, [dateOrders, selectedBuilding, selectedFloor, searchQuery]);
+  }, [dateOrders, selectedBuilding, selectedFloor, searchQuery, collectionGroupRules]);
 
   // Workday stats calculated with user's specific business rules:
   const workdayStats = useMemo(() => {
@@ -505,7 +500,7 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="상호/호수/메모 검색"
+                  placeholder="상호/대표거래처/호수/메모 검색 (초성 가능)"
                   className="w-full bg-gray-800 text-white border border-gray-700 rounded-lg pl-7 pr-3 py-1.5 text-xs outline-none focus:ring-1 focus:ring-blue-500 placeholder-gray-500"
                 />
                 <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2 top-1/2 -translate-y-1/2" />
@@ -607,6 +602,22 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(
                           <h2 className="text-lg sm:text-xl font-black text-white tracking-wide break-keep shrink-0">
                             {order.store || '상호 미등록'}
                           </h2>
+                          {(() => {
+                            const repStore = (collectionGroupRules && collectionGroupRules.length > 0)
+                              ? getCollectionBillingStore(order.store || '', collectionGroupRules)
+                              : '';
+                            const isSubordinate = repStore && repStore !== order.store;
+                            if (!isSubordinate) return null;
+                            return (
+                              <span 
+                                className="text-[11px] text-violet-200 bg-violet-950/90 border border-violet-700/80 px-2 py-0.5 rounded-md font-bold shrink-0 mt-0.5 sm:mt-0 flex items-center gap-1 shadow-2xs"
+                                title={`대표거래처: ${repStore}`}
+                              >
+                                <Layers className="w-3 h-3 text-violet-400" />
+                                대표: {repStore}
+                              </span>
+                            );
+                          })()}
                           {order.region && (
                             <span className="text-[11px] text-violet-300 bg-violet-900/60 border border-violet-700/60 px-2 py-0.5 rounded-md font-bold shrink-0 mt-0.5 sm:mt-0">
                               {order.region}

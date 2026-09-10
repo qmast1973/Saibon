@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
-import { Transaction, User } from '../types';
+import { Transaction, User, CollectionGroupRule } from '../types';
 import { CollectionList } from './CollectionList';
 import {
   normalizeMarketName,
@@ -10,6 +10,7 @@ import {
   rtdb,
   formatMoney
 } from '../lib/firebase';
+import { matchesTransactionWithGroup, getCollectionBillingStore } from '../lib/groupRules';
 import {
   Building2,
   Calendar,
@@ -32,6 +33,7 @@ import {
 interface BuyerWorkdayStatsScreenProps {
   currentUser: User;
   transactions: Transaction[];
+  collectionGroupRules?: CollectionGroupRule[];
   selectedDateStr: string;
   onSelectDateStr: (date: string) => void;
   onLogout: () => void;
@@ -44,6 +46,7 @@ interface BuyerWorkdayStatsScreenProps {
 export const BuyerWorkdayStatsScreen: React.FC<BuyerWorkdayStatsScreenProps> = React.memo(({
   currentUser,
   transactions,
+  collectionGroupRules = [],
   selectedDateStr,
   onSelectDateStr,
   onLogout,
@@ -142,11 +145,7 @@ export const BuyerWorkdayStatsScreen: React.FC<BuyerWorkdayStatsScreenProps> = R
     }
 
     if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase();
-      list = list.filter(item => {
-        const combined = `${item.store} ${item.room} ${item.manager} ${item.remark} ${item.market}`.toLowerCase();
-        return combined.includes(q);
-      });
+      list = list.filter(item => matchesTransactionWithGroup(item, searchQuery, collectionGroupRules || []));
     }
 
     return list.sort((a, b) => {
@@ -162,7 +161,7 @@ export const BuyerWorkdayStatsScreen: React.FC<BuyerWorkdayStatsScreenProps> = R
       const rB = String(b.room || '');
       return rA.localeCompare(rB, 'ko', { numeric: true });
     });
-  }, [dateOrders, selectedBuilding, selectedFloor, statusFilter, searchQuery]);
+  }, [dateOrders, selectedBuilding, selectedFloor, statusFilter, searchQuery, collectionGroupRules]);
 
   // Create scopeOrders that ignores statusFilter for top stats, but includes searchQuery
   const scopeOrders = useMemo(() => {
@@ -180,15 +179,11 @@ export const BuyerWorkdayStatsScreen: React.FC<BuyerWorkdayStatsScreenProps> = R
     }
 
     if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase();
-      list = list.filter(item => {
-        const combined = `${item.store} ${item.room} ${item.manager} ${item.remark} ${item.market}`.toLowerCase();
-        return combined.includes(q);
-      });
+      list = list.filter(item => matchesTransactionWithGroup(item, searchQuery, collectionGroupRules || []));
     }
     
     return list;
-  }, [dateOrders, selectedBuilding, selectedFloor, searchQuery]);
+  }, [dateOrders, selectedBuilding, selectedFloor, searchQuery, collectionGroupRules]);
 
   // Workday stats calculated with user's specific business rules:
   const workdayStats = useMemo(() => {
@@ -273,7 +268,10 @@ export const BuyerWorkdayStatsScreen: React.FC<BuyerWorkdayStatsScreenProps> = R
     }>();
 
     filteredOrders.forEach(t => {
-      const key = (t.store || '미지정').trim();
+      const rawStore = (t.store || '미지정').trim();
+      const key = (collectionGroupRules && collectionGroupRules.length > 0)
+        ? getCollectionBillingStore(rawStore, collectionGroupRules)
+        : rawStore;
       if (!map.has(key)) {
         map.set(key, {
           store: key,
@@ -306,7 +304,7 @@ export const BuyerWorkdayStatsScreen: React.FC<BuyerWorkdayStatsScreenProps> = R
     });
 
     return Array.from(map.values()).sort((a, b) => a.store.localeCompare(b.store, 'ko'));
-  }, [filteredOrders]);
+  }, [filteredOrders, collectionGroupRules]);
 
   // Update Status (완료 / 미송 / 반품)
   const handleUpdateStatus = async (tx: Transaction, newStatus: string) => {
@@ -543,7 +541,7 @@ export const BuyerWorkdayStatsScreen: React.FC<BuyerWorkdayStatsScreenProps> = R
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="상호/호수/메모 검색"
+                  placeholder="상호/대표거래처/호수/메모 검색 (초성 가능)"
                   className="w-full bg-gray-800 text-white border border-gray-700 rounded-lg pl-7 pr-3 py-1.5 text-xs outline-none focus:ring-1 focus:ring-blue-500 placeholder-gray-500"
                 />
                 <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2 top-1/2 -translate-y-1/2" />

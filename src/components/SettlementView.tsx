@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { Transaction, CollectionGroupRule } from '../types';
 import { formatMoney, normalizeMarketName } from '../lib/firebase';
+import { getCollectionBillingStore, matchesTransactionWithGroup } from '../lib/groupRules';
 import { HandCoins, Search, ChevronDown, ChevronUp, Layers, Store } from 'lucide-react';
 
 interface SettlementViewProps {
@@ -24,17 +25,6 @@ export const SettlementView: React.FC<SettlementViewProps> = ({
   const toggleGroup = (key: string) => {
     setExpandedGroups(prev => ({ ...prev, [key]: !prev[key] }));
   };
-
-  // Rule lookup map
-  const getCollectionBillingStore = useCallback((store: string) => {
-    const name = String(store || '').trim();
-    if (!name) return name;
-    const matched = (collectionGroupRules || []).filter(rule => {
-      const ruleStore = String(rule.storeName || '').trim();
-      return rule.matchType === 'prefix' ? name.startsWith(ruleStore) : name === ruleStore;
-    }).sort((a, b) => String(b.effectiveFrom || '').localeCompare(String(a.effectiveFrom || '')));
-    return matched.length ? String(matched[0].groupName || name).trim() : name;
-  }, [collectionGroupRules]);
 
   const getKoreanInitials = (value: string) => {
     const choseong = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
@@ -62,12 +52,12 @@ export const SettlementView: React.FC<SettlementViewProps> = ({
         _region: String(t.region || '미지정').trim() || '미지정',
         _manager: String(t.localManager || t.originalManager || t.manager || '미지정').trim() || '미지정',
         _store: String(t.store || '미지정').trim() || '미지정',
-        _billingStore: getCollectionBillingStore(t.store),
+        _billingStore: getCollectionBillingStore(t.store, collectionGroupRules || []),
         _expense: billed,
         _income: paid
       };
     });
-  }, [transactions, getCollectionBillingStore]);
+  }, [transactions, collectionGroupRules]);
 
   const ledgerRows = useMemo(() => {
     return rows.filter(t => normalizeMarketName(t.market || '') !== '미수금');
@@ -78,12 +68,15 @@ export const SettlementView: React.FC<SettlementViewProps> = ({
 
   const filtered = useMemo(() => {
     return rows.filter(t => {
-      const storeOk = matchesQuery(t._billingStore, search) || matchesQuery(t._store, search);
+      const storeOk = !search.trim() || 
+        matchesTransactionWithGroup(t, search, collectionGroupRules || []) ||
+        matchesQuery(t._billingStore, search) || 
+        matchesQuery(t._store, search);
       const regionOk = !regionFilter || t._region === regionFilter;
       const managerOk = !managerFilter || t._manager === managerFilter;
       return storeOk && regionOk && managerOk;
     });
-  }, [rows, search, regionFilter, managerFilter]);
+  }, [rows, search, regionFilter, managerFilter, collectionGroupRules]);
 
   // Group by Region + Local Manager
   const groups = useMemo(() => {

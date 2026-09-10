@@ -1,13 +1,15 @@
 import React, { useMemo, useState } from 'react';
-import { Transaction, User } from '../types';
+import { Transaction, User, CollectionGroupRule } from '../types';
 import { formatMoney, normalizeDateStr } from '../lib/firebase';
-import { ChevronLeft, ChevronRight, CalendarCheck, Plus, Edit, Trash2, CheckCircle2, Sparkles } from 'lucide-react';
+import { getCollectionBillingStore } from '../lib/groupRules';
+import { ChevronLeft, ChevronRight, CalendarCheck, Plus, Edit, Trash2, CheckCircle2, Sparkles, Layers } from 'lucide-react';
 
 interface CalendarViewProps {
   currentDate: Date;
   selectedDateStr: string;
   transactions: Transaction[];
   currentUser: User | null;
+  collectionGroupRules?: CollectionGroupRule[];
   onSelectDate: (dateStr: string, hasData: boolean) => void;
   onChangeMonth: (delta: number) => void;
   onGoToToday: () => void;
@@ -25,6 +27,7 @@ export const CalendarView: React.FC<CalendarViewProps> = React.memo(({
   selectedDateStr,
   transactions,
   currentUser,
+  collectionGroupRules = [],
   onSelectDate,
   onChangeMonth,
   onGoToToday,
@@ -283,6 +286,8 @@ export const CalendarView: React.FC<CalendarViewProps> = React.memo(({
           ) : (
             dayTxs.map(t => {
               const isCompleted = (t.status || '').trim() === '완료';
+              const repStore = collectionGroupRules.length > 0 ? getCollectionBillingStore(t.store, collectionGroupRules) : '';
+              const isSubordinate = repStore && repStore !== t.store;
 
               return (
                 <div
@@ -294,6 +299,15 @@ export const CalendarView: React.FC<CalendarViewProps> = React.memo(({
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="font-bold text-slate-800 text-sm">{t.store || '미지정 상호'}</span>
+                      {isSubordinate && (
+                        <span 
+                          className="bg-violet-100 text-violet-800 border border-violet-200 text-[10px] px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5 shadow-2xs" 
+                          title={`대표 거래처: ${repStore}`}
+                        >
+                          <Layers className="w-2.5 h-2.5 text-violet-600" />
+                          <span>대표: {repStore}</span>
+                        </span>
+                      )}
                       {t.manager && (
                         <span className="bg-indigo-100 text-indigo-800 text-[10px] px-1.5 py-0.5 rounded font-semibold">
                           {t.manager}
@@ -332,9 +346,9 @@ export const CalendarView: React.FC<CalendarViewProps> = React.memo(({
                       {currentUser?.role === 'admin' && (
                         <button
                           type="button"
-                          onClick={() => setDeleteConfirmId(t.id)}
-                          className="text-slate-400 hover:text-rose-600 p-1"
-                          title="삭제"
+                          onClick={() => onDeleteTransaction(t.id)}
+                          className="text-slate-400 hover:text-rose-600 p-1 transition rounded hover:bg-rose-50"
+                          title="삭제 (즉시 삭제)"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -367,7 +381,7 @@ export const CalendarView: React.FC<CalendarViewProps> = React.memo(({
       </div>
 
       {deleteConfirmId && (
-        <div className="fixed inset-0 bg-slate-900/50 z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/60 z-[9999] flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
             <div className="p-6">
               <h3 className="text-lg font-bold text-slate-800 mb-2">주문 삭제</h3>

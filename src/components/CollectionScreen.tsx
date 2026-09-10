@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Transaction, CollectionRecord, User, CollectionGroupRule } from '../types';
 import { CollectionList } from './CollectionList';
 import { formatMoney, normalizeMarketName, getBusinessDate } from '../lib/firebase';
+import { getCollectionBillingStore, matchesTransactionWithGroup, getKoreanInitials, normalizeStoreName } from '../lib/groupRules';
 import { HandCoins, Plus, Search, Layers, X, Download, Upload, Trash2, Edit3, ArrowLeft } from 'lucide-react';
 
 interface CollectionScreenProps {
@@ -70,14 +71,8 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
 
   const isAdmin = currentUser?.role === 'admin';
 
-  const getCollectionBillingStore = useCallback((store: string) => {
-    const name = String(store || '').trim();
-    if (!name) return name;
-    const matched = (collectionGroupRules || []).filter(rule => {
-      const ruleStore = String(rule.storeName || '').trim();
-      return rule.matchType === 'prefix' ? name.startsWith(ruleStore) : name === ruleStore;
-    }).sort((a, b) => String(b.effectiveFrom || '').localeCompare(String(a.effectiveFrom || '')));
-    return matched.length ? String(matched[0].groupName || name).trim() : name;
+  const getCollectionBillingStoreLocal = useCallback((store: string) => {
+    return getCollectionBillingStore(store, collectionGroupRules || []);
   }, [collectionGroupRules]);
 
   const getKoreanInitials = (value: string) => {
@@ -123,12 +118,12 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
           _manager: String(t.localManager || t.originalManager || t.manager || '미지정').trim() || '미지정',
           _buyer: buyerName,
           _store: String(t.store || '미지정').trim() || '미지정',
-          _billingStore: getCollectionBillingStore(t.store),
+          _billingStore: getCollectionBillingStore(t.store, collectionGroupRules || []),
           _expense: billed,
           _income: paid
         };
       });
-  }, [transactions, dateFilter, getCollectionBillingStore]);
+  }, [transactions, dateFilter, collectionGroupRules]);
 
   const totalBilled = useMemo(() => ledgerRows.reduce((a, t) => a + t._expense, 0), [ledgerRows]);
   const totalPaid = useMemo(() => ledgerRows.reduce((a, t) => a + t._income, 0), [ledgerRows]);
@@ -167,7 +162,10 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
 
   const filteredRows = useMemo(() => {
     return ledgerRows.filter(t => {
-      const storeOk = matchesQuery(t._billingStore, storeFilter) || matchesQuery(t._store, storeFilter);
+      const storeOk = !storeFilter.trim() ||
+        matchesTransactionWithGroup(t, storeFilter, collectionGroupRules || []) ||
+        matchesQuery(t._billingStore, storeFilter) || 
+        matchesQuery(t._store, storeFilter);
       const buyerOk = !buyerFilter || 
         t._buyer === buyerFilter || 
         t.manager === buyerFilter || 
@@ -187,7 +185,7 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
       }
       return storeOk && buyerOk && statusOk;
     });
-  }, [ledgerRows, storeFilter, buyerFilter, statusFilter]);
+  }, [ledgerRows, storeFilter, buyerFilter, statusFilter, collectionGroupRules]);
 
   // Group by Store (상호)
   const groupMap = useMemo(() => {
@@ -245,9 +243,18 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
 
   const uniqueStores = useMemo(() => {
     const stores = new Set<string>();
-    transactions.forEach(t => stores.add(getCollectionBillingStore(String(t.store || '미지정').trim() || '미지정')));
-    return Array.from(stores).filter(Boolean).sort();
-  }, [transactions, getCollectionBillingStore]);
+    transactions.forEach(t => {
+      const s = String(t.store || '미지정').trim();
+      const bStore = getCollectionBillingStore(s, collectionGroupRules || []);
+      if (bStore) stores.add(bStore);
+      if (s) stores.add(s);
+    });
+    (collectionGroupRules || []).forEach(r => {
+      if (r && r.groupName) stores.add(r.groupName.trim());
+      if (r && r.storeName) stores.add(r.storeName.trim());
+    });
+    return Array.from(stores).filter(Boolean).sort((a, b) => a.localeCompare(b, 'ko'));
+  }, [transactions, collectionGroupRules]);
 
   const filteredStoresForEntry = useMemo(() => {
     // Show all if empty, otherwise filter by chosung / substring
@@ -437,7 +444,7 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
                   type="text"
                   value={storeFilter}
                   onChange={(e) => setStoreFilter(e.target.value)}
-                  placeholder="상호 검색 (초성 가능: ㄱㄹㄷ)"
+                  placeholder="상호/대표거래처 검색 (초성 가능: ㄱㄹㄷ)"
                   className="border border-gray-700 rounded-xl pl-8 pr-3 py-2 text-xs w-full bg-gray-900 outline-none focus:ring-2 focus:ring-indigo-500"
                 />
                 <Search className="w-3.5 h-3.5 text-gray-500 absolute left-2.5 top-2.5" />
@@ -494,7 +501,18 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
             onToggleComplete={handleToggleComplete}
             onAddCollection={handleOpenEntry}
             onEditDeposit={(t) => { setEditTxInfo(t); setEditAmount(String(t._income)); }}
-            onDeleteDeposit={(id) => setDeleteConfirmId(id)}
+            onDeleteDeposit={(id) => {
+              if (onDeleteTransaction) {
+                onDeleteTransaction(id);
+              }
+            }}
+            onOpenOrderDetail={(tx) => {
+              if (onEditTransaction) {
+                onEditTransaction(tx);
+              } else if (onOpenOrderDetail) {
+                onOpenOrderDetail(tx.id);
+              }
+            }}
           />
         )}
         {/* Collection Entry Modal */}
@@ -750,7 +768,7 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
 
         {/* Custom Delete Confirm Modal */}
         {deleteConfirmId && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
             <div className="bg-gray-900 rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
               <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4">
                 <Trash2 className="w-6 h-6" />

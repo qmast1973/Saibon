@@ -53,7 +53,8 @@ const BoardScreen = lazy(() => import('./components/BoardScreen').then(module =>
 const ExcelImportWizard = lazy(() => import('./components/ExcelImportWizard').then(module => ({ default: module.ExcelImportWizard })));
 const LocalMerchantInfoModal = lazy(() => import('./components/LocalMerchantInfoModal').then(module => ({ default: module.LocalMerchantInfoModal })));
 const DataManagementModal = lazy(() => import('./components/DataManagementModal').then(module => ({ default: module.DataManagementModal })));
-const BuildingManagerModal = lazy(() => import('./components/BuildingManagerModal').then(module => ({ default: module.BuildingManagerModal })));
+import { BuildingManagerModal } from './components/BuildingManagerModal';
+import { matchesTransactionWithGroup } from './lib/groupRules';
 
 import { Search, Layers } from 'lucide-react';
 
@@ -474,14 +475,33 @@ export default function App() {
       });
     }
 
-    const q = deferredSearchQuery.trim().toLowerCase();
-    if (!q) return result;
+    if (deferredSearchQuery.trim()) {
+      result = result.filter(t => matchesTransactionWithGroup(t, deferredSearchQuery, collectionGroupRules));
+    }
 
-    return result.filter(t => {
-      const combined = `${t.store} ${t.manager} ${t.market} ${t.region} ${t.status} ${t.remark}`.toLowerCase();
-      return combined.includes(q);
+    return result;
+  }, [roleFilteredTransactions, deferredSearchQuery, currentUser?.role, merchantStoreFilter, collectionGroupRules]);
+
+  // Check if admin is currently searching for a representative group store
+  const matchedAdminGroup = useMemo(() => {
+    if (!deferredSearchQuery.trim() || currentUser?.role !== 'admin') return null;
+    const cleanQ = String(deferredSearchQuery).replace(/\s+/g, '').toLowerCase();
+    const rules = collectionGroupRules || [];
+    const found = rules.find(r => {
+      if (!r || !r.groupName) return false;
+      const cleanG = String(r.groupName).replace(/\s+/g, '').toLowerCase();
+      return cleanG === cleanQ || cleanG.includes(cleanQ) || cleanQ.includes(cleanG);
     });
-  }, [roleFilteredTransactions, deferredSearchQuery, currentUser?.role, merchantStoreFilter]);
+    if (!found) return null;
+    const groupName = found.groupName.trim();
+    const cleanG = String(groupName).replace(/\s+/g, '').toLowerCase();
+    const subStores = Array.from(new Set(
+      rules
+        .filter(r => r && r.groupName && String(r.groupName).replace(/\s+/g, '').toLowerCase() === cleanG)
+        .map(r => r.storeName.trim())
+    ));
+    return { groupName, subStores };
+  }, [deferredSearchQuery, currentUser?.role, collectionGroupRules]);
 
   // Month navigation
   const handleChangeMonth = useCallback((delta: number) => {
@@ -1001,8 +1021,8 @@ export default function App() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="상호, 건물, 비고, 담당자 검색..."
-              className="border border-gray-700 rounded-xl pl-8 pr-3 py-1.5 bg-gray-900 w-full outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-gray-900 text-xs"
+              placeholder="상호, 대표거래처, 건물, 비고, 담당자 검색 (초성 가능: ㅎㅊㅋㅅ)..."
+              className="border border-gray-700 rounded-xl pl-8 pr-3 py-1.5 bg-gray-900 w-full outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-gray-900 text-xs text-gray-100 placeholder:text-gray-500"
             />
             <Search className="w-3.5 h-3.5 text-gray-500 absolute left-2.5 top-2" />
     </div>
@@ -1018,12 +1038,28 @@ export default function App() {
           )}
         </section>
 
+        {/* Admin Representative Group Search Notice */}
+        {matchedAdminGroup && (
+          <section className="bg-gradient-to-r from-violet-950/80 to-indigo-950/80 border border-violet-700/70 rounded-xl p-2.5 px-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-bold text-violet-200 flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-violet-400" />
+                대표거래처 <span className="text-white font-extrabold underline decoration-violet-400">'{matchedAdminGroup.groupName}'</span> 검색 적용 중
+              </span>
+              <span className="text-[11px] text-gray-300">
+                (종속 거래처: {matchedAdminGroup.subStores.length > 0 ? matchedAdminGroup.subStores.join(', ') : '지정됨'} 주문 포함 총 {filteredTransactions.length}건)
+              </span>
+            </div>
+          </section>
+        )}
+
         {/* Primary View: Calendar */}
         <CalendarView
           currentDate={currentDate}
           selectedDateStr={selectedDateStr}
           transactions={filteredTransactions}
           currentUser={currentUser}
+          collectionGroupRules={collectionGroupRules}
           onOpenAiModal={handleOpenAiModal}
           onSelectDate={handleSelectDate}
           onChangeMonth={handleChangeMonth}
@@ -1203,6 +1239,7 @@ export default function App() {
         <BuyerWorkdayStatsScreen
           currentUser={currentUser}
           transactions={roleFilteredTransactions}
+          collectionGroupRules={collectionGroupRules}
           selectedDateStr={selectedDateStr}
           onSelectDateStr={setSelectedDateStr}
           onLogout={handleLogout}
@@ -1222,6 +1259,7 @@ export default function App() {
         <BuyerWorkdayScreen
           currentUser={currentUser}
           transactions={roleFilteredTransactions}
+          collectionGroupRules={collectionGroupRules}
           selectedDateStr={selectedDateStr}
           onSelectDateStr={setSelectedDateStr}
           onLogout={handleLogout}

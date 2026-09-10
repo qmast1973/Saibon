@@ -158,8 +158,8 @@ export const CollectionList: React.FC<CollectionListProps> = ({
         if (mode === 'stats' && matchedGroup?.orders) {
           storeOrders = matchedGroup.orders;
         } else if (allTransactions) {
-          // For Collection mode which filters dynamically on _billingStore
-          const storeRows = allTransactions.filter(t => (t as any)._billingStore === orderListStore);
+          // For Collection mode which filters dynamically on _billingStore or direct store
+          const storeRows = allTransactions.filter(t => (t as any)._billingStore === orderListStore || t.store === orderListStore);
           storeOrders = storeRows;
         }
 
@@ -263,6 +263,11 @@ export const CollectionList: React.FC<CollectionListProps> = ({
                           <span className={`text-[13px] font-bold ${mStoreName} shrink-0`}>
                             {t.store || '상호 없음'}
                           </span>
+                          {t.store && orderListStore && t.store.trim().toLowerCase() !== orderListStore.trim().toLowerCase() && (
+                            <span className="text-[10px] bg-violet-900/60 text-violet-200 border border-violet-700/60 px-1.5 py-0.5 rounded font-bold shrink-0">
+                              종속: {t.store}
+                            </span>
+                          )}
                           {(t.remark || t.processingRemark) && (
                             <span className={`text-[11px] truncate ${mRemark} px-1.5 py-0.5 rounded ml-1`}>
                               {[t.remark, t.processingRemark].filter(Boolean).join(' | ')}
@@ -287,7 +292,7 @@ export const CollectionList: React.FC<CollectionListProps> = ({
                             )}
                           </div>
                           
-                          {mode === 'stats' && onOpenOrderDetail && (
+                          {!isDeposit && onOpenOrderDetail && (
                             <button
                               type="button"
                               onClick={() => {
@@ -295,8 +300,9 @@ export const CollectionList: React.FC<CollectionListProps> = ({
                                 onOpenOrderDetail(t);
                               }}
                               className={`px-2 py-1.5 border ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-gray-300 hover:text-indigo-400 hover:border-indigo-800 hover:bg-indigo-900/50' : 'border-slate-300 bg-white text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-300'} rounded text-[10px] font-bold transition whitespace-nowrap active:scale-95 cursor-pointer`}
+                              title="주문 확인 및 수정"
                             >
-                              수정/상세
+                              주문확인
                             </button>
                           )}
 
