@@ -200,9 +200,9 @@ export const ExcelImportWizard: React.FC<ExcelImportWizardProps> = ({
                   미수금은 날짜별로 선택됩니다. 체크한 날짜의 미수금 전체가 포함됩니다.
                 </p>
               </div>
-              <button type="button" onClick={onClose} className="text-amber-100 hover:text-white p-1">
-                <X className="w-5 h-5" />
-              </button>
+              <button type="button" onClick={onClose} className="px-3 py-1.5 bg-amber-800 hover:bg-amber-700 text-amber-100 text-xs sm:text-sm font-bold rounded-lg transition-colors cursor-pointer ml-auto shrink-0">
+            [닫기]
+          </button>
             </div>
 
             <div className="p-5 space-y-3 overflow-y-auto flex-1 text-xs">
@@ -282,9 +282,9 @@ export const ExcelImportWizard: React.FC<ExcelImportWizardProps> = ({
                   가져올 주문 및 입금 일자를 선택합니다.
                 </p>
               </div>
-              <button type="button" onClick={onClose} className="text-emerald-100 hover:text-white p-1">
-                <X className="w-5 h-5" />
-              </button>
+              <button type="button" onClick={onClose} className="px-3 py-1.5 bg-emerald-800 hover:bg-emerald-700 text-emerald-100 text-xs sm:text-sm font-bold rounded-lg transition-colors cursor-pointer ml-auto shrink-0">
+            [닫기]
+          </button>
             </div>
 
             <div className="p-5 space-y-3 overflow-y-auto flex-1 text-xs">
@@ -360,9 +360,9 @@ export const ExcelImportWizard: React.FC<ExcelImportWizardProps> = ({
                   엑셀의 담당자명이 어떤 역할인지 확인하고 매핑합니다.
                 </p>
               </div>
-              <button type="button" onClick={onClose} className="text-slate-300 hover:text-white p-1">
-                <X className="w-5 h-5" />
-              </button>
+              <button type="button" onClick={onClose} className="px-3 py-1.5 bg-indigo-800 hover:bg-indigo-700 text-indigo-100 text-xs sm:text-sm font-bold rounded-lg transition-colors cursor-pointer ml-auto shrink-0">
+            [닫기]
+          </button>
             </div>
 
             <div className="p-5 space-y-4 overflow-y-auto flex-1 text-xs">

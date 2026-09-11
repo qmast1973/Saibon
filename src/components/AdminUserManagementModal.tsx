@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { User, UserRole } from '../types';
 import { saveUserToFirebase, deleteUserFromFirebase, sha256, firebaseSendPasswordReset } from '../lib/firebase';
 import { deleteLocalUser } from '../lib/storage';
@@ -23,6 +23,13 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
   onOpenGroupRules,
   onUserDeleted
 }) => {
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, []);
+
   const [userToDelete, setUserToDelete] = React.useState<User | null>(null);
   const [alertMsg, setAlertMsg] = React.useState<string | null>(null);
   const handleToggleBuyerAdmin = async (user: User) => {
@@ -137,7 +144,7 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
     : users;
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[250] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[250] flex items-center justify-center p-3 sm:p-4 overflow-y-auto overscroll-contain">
       <div className="w-full max-w-2xl bg-gray-900 rounded-2xl shadow-2xl border border-gray-800 overflow-hidden flex flex-col max-h-[90vh]">
         {/* Custom Alert/Confirm */}
         {alertMsg && (
@@ -172,8 +179,8 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
               전체 가입 회원의 승인 여부, 담당 지역/건물 권한, 비밀번호 초기화 및 정보를 관리합니다.
             </p>
           </div>
-          <button type="button" onClick={onClose} className="text-slate-300 hover:text-white p-1">
-            <X className="w-5 h-5" />
+          <button type="button" onClick={onClose} className="px-3 py-1.5 bg-indigo-800 hover:bg-indigo-700 text-indigo-100 text-xs sm:text-sm font-bold rounded-lg transition-colors cursor-pointer ml-auto shrink-0">
+            [닫기]
           </button>
         </div>
 
@@ -207,7 +214,7 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
         </div>
 
         {/* User list by role category */}
-        <div className="p-4 overflow-y-auto space-y-4">
+        <div className="p-4 overflow-y-auto space-y-4 overscroll-contain">
           {visibleCategories.map(cat => {
             const groupUsers = visibleUsers.filter(u => u.role === cat.role);
             if (groupUsers.length === 0) return null;

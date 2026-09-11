@@ -9,6 +9,13 @@ interface BuildingManagerModalProps {
 }
 
 export const BuildingManagerModal: React.FC<BuildingManagerModalProps> = ({ onClose, onMarketsUpdated }) => {
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, []);
+
   const [markets, setMarkets] = useState<string[]>([]);
   const [newMarket, setNewMarket] = useState('');
   const [loading, setLoading] = useState(true);
@@ -70,12 +77,12 @@ export const BuildingManagerModal: React.FC<BuildingManagerModalProps> = ({ onCl
             <Building className="w-5 h-5 text-indigo-300" />
             <h3 className="font-bold text-base">건물(도매상가) 관리</h3>
           </div>
-          <button type="button" onClick={onClose} className="text-slate-300 hover:text-white p-1">
-            <X className="w-5 h-5" />
+          <button type="button" onClick={onClose} className="px-3 py-1.5 bg-indigo-800 hover:bg-indigo-700 text-indigo-100 text-xs sm:text-sm font-bold rounded-lg transition-colors cursor-pointer ml-auto shrink-0">
+            [닫기]
           </button>
         </div>
 
-        <div className="p-5 flex-1 overflow-y-auto flex flex-col min-h-0 bg-gray-900">
+        <div className="p-5 flex-1 overflow-y-auto flex flex-col min-h-0 bg-gray-900 overscroll-contain">
           {error && (
             <div className="mb-4 p-3 bg-red-50 text-red-700 text-xs rounded-xl border border-red-200">
               {error}
@@ -102,7 +109,7 @@ export const BuildingManagerModal: React.FC<BuildingManagerModalProps> = ({ onCl
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto border border-gray-800 rounded-xl bg-gray-900 shadow-inner p-2 space-y-1">
+          <div className="flex-1 overflow-y-auto border border-gray-800 rounded-xl bg-gray-900 shadow-inner p-2 space-y-1 overscroll-contain">
             {loading ? (
               <div className="h-20 flex items-center justify-center text-gray-500">
                 <Loader2 className="w-5 h-5 animate-spin" />

@@ -442,7 +442,7 @@ export const BuyerWorkdayStatsScreen: React.FC<BuyerWorkdayStatsScreenProps> = R
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap max-w-full overflow-hidden">
             <button
               id="btnTopExportExcelStats"
               type="button"
@@ -467,10 +467,11 @@ export const BuyerWorkdayStatsScreen: React.FC<BuyerWorkdayStatsScreenProps> = R
             <button
               type="button"
               onClick={onLogout}
-              className="bg-gray-900 hover:bg-gray-800 text-gray-400 hover:text-white p-2 rounded-lg border border-gray-800 transition cursor-pointer"
+              className="px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-[11px] sm:text-xs font-bold transition flex items-center gap-1 shadow-md h-full min-h-[32px] sm:min-h-[36px]"
               title="로그아웃"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">로그아웃</span>
             </button>
           </div>
         </div>

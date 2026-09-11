@@ -20,6 +20,8 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ currentUser, onClose }
   const [submittingComment, setSubmittingComment] = useState<string | null>(null);
   
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [confirmDeletePostId, setConfirmDeletePostId] = useState<string | null>(null);
+  const [confirmDeleteCommentId, setConfirmDeleteCommentId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
   const [isEditSubmitting, setIsEditSubmitting] = useState(false);
@@ -52,18 +54,13 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ currentUser, onClose }
     }
   };
 
-  const handleCommentDelete = async (postId: string, commentId: string, authorUsername: string) => {
-    if (authorUsername !== currentUser.username && currentUser.role !== 'admin') {
-      alert('본인이 작성한 댓글만 삭제할 수 있습니다.');
-      return;
-    }
-    if (confirm('댓글을 삭제하시겠습니까?')) {
-      try {
-        await deleteBoardComment(postId, commentId);
-      } catch (err) {
-        console.error('댓글 삭제 오류:', err);
-        alert('삭제에 실패했습니다.');
-      }
+  const handleCommentDelete = async (postId: string, commentId: string) => {
+    try {
+      await deleteBoardComment(postId, commentId);
+      setConfirmDeleteCommentId(null);
+    } catch (err) {
+      console.error('댓글 삭제 오류:', err);
+      alert('삭제에 실패했습니다.');
     }
   };
 
@@ -93,18 +90,13 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ currentUser, onClose }
     }
   };
 
-  const handleDelete = async (id: string, authorUsername: string) => {
-    if (authorUsername !== currentUser.username && currentUser.role !== 'admin') {
-      alert('본인이 작성한 글만 삭제할 수 있습니다.');
-      return;
-    }
-    if (confirm('정말 삭제하시겠습니까?')) {
-      try {
-        await deleteBoardPost(id);
-      } catch (err) {
-        console.error('글 삭제 오류:', err);
-        alert('글 삭제에 실패했습니다.');
-      }
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteBoardPost(id);
+      setConfirmDeletePostId(null);
+    } catch (err) {
+      console.error('글 삭제 오류:', err);
+      alert('글 삭제에 실패했습니다.');
     }
   };
 
@@ -224,13 +216,27 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ currentUser, onClose }
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
-                        <button
-                          onClick={() => handleDelete(post.id, post.authorUsername)}
-                          className="p-1.5 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
-                          title="삭제"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {confirmDeletePostId === post.id ? (
+                          <div className="flex items-center gap-1 bg-red-900/40 px-2 py-1 rounded-lg border border-red-700/50">
+                            <span className="text-xs text-red-200 font-bold mr-1">삭제할까요?</span>
+                            <button onClick={() => handleDelete(post.id)} className="text-xs bg-red-600 hover:bg-red-500 text-white px-2 py-1 rounded">확인</button>
+                            <button onClick={() => setConfirmDeletePostId(null)} className="text-xs bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded">취소</button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              if (post.authorUsername !== currentUser.username && currentUser.role !== 'admin') {
+                                alert('본인이 작성한 글만 삭제할 수 있습니다.');
+                                return;
+                              }
+                              setConfirmDeletePostId(post.id);
+                            }}
+                            className="p-1.5 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
+                            title="삭제"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -257,13 +263,20 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ currentUser, onClose }
                         <p className="text-sm text-gray-300 whitespace-pre-wrap">{comment.content}</p>
                       </div>
                       {(currentUser.username === comment.authorUsername || currentUser.role === 'admin') && (
-                        <button
-                          onClick={() => handleCommentDelete(post.id, commentId, comment.authorUsername)}
-                          className="p-1 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded transition opacity-0 group-hover:opacity-100 sm:opacity-100"
-                          title="댓글 삭제"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        confirmDeleteCommentId === commentId ? (
+                          <div className="flex items-center gap-1 bg-red-900/40 px-2 py-0.5 rounded border border-red-700/50 ml-2">
+                            <button onClick={() => handleCommentDelete(post.id, commentId)} className="text-[10px] bg-red-600 hover:bg-red-500 text-white px-1.5 py-0.5 rounded">삭제 확인</button>
+                            <button onClick={() => setConfirmDeleteCommentId(null)} className="text-[10px] bg-gray-700 hover:bg-gray-600 text-white px-1.5 py-0.5 rounded">취소</button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmDeleteCommentId(commentId)}
+                            className="p-1 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded transition opacity-0 group-hover:opacity-100 sm:opacity-100 ml-2"
+                            title="댓글 삭제"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )
                       )}
                     </div>
                   ))}
@@ -305,9 +318,9 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ currentUser, onClose }
               <h3 className="text-lg font-bold text-gray-100">새 게시글 작성</h3>
               <button 
                 onClick={() => setShowModal(false)}
-                className="p-2 text-gray-500 hover:text-gray-600 hover:bg-gray-800 rounded-xl transition"
+                className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs sm:text-sm font-bold rounded-lg transition-colors cursor-pointer ml-auto shrink-0"
               >
-                <X className="w-5 h-5" />
+                [닫기]
               </button>
             </div>
             

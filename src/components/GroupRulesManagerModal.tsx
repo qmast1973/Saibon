@@ -26,6 +26,13 @@ export const GroupRulesManagerModal: React.FC<GroupRulesManagerModalProps> = ({
   onClose,
   onRulesUpdated
 }) => {
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, []);
+
   // 내부 즉각 반응형 로컬 규칙 상태 (상위 및 저장소와 실시간 동기화)
   const [localRules, setLocalRules] = useState<CollectionGroupRule[]>(rules || []);
 
@@ -388,10 +395,10 @@ export const GroupRulesManagerModal: React.FC<GroupRulesManagerModalProps> = ({
   return (
     <div 
       id="groupRulesManagerModal" 
-      className="fixed inset-0 bg-black/80 z-[300] flex items-center justify-center p-2 sm:p-4 overflow-y-auto"
+      className="fixed inset-0 bg-black/80 z-[300] flex items-center justify-center p-2 sm:p-4 overflow-y-auto overscroll-contain"
     >
       <div 
-        className="bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl border border-gray-800 p-4 sm:p-6 my-auto flex flex-col max-h-[92vh] overflow-y-auto space-y-4 relative"
+        className="bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl border border-gray-800 p-4 sm:p-6 my-auto flex flex-col max-h-[92vh] overflow-y-auto space-y-4 relative overscroll-contain"
       >
         
         {/* 모달 헤더 */}
@@ -412,9 +419,9 @@ export const GroupRulesManagerModal: React.FC<GroupRulesManagerModalProps> = ({
           <button 
             type="button" 
             onClick={onClose} 
-            className="text-gray-400 hover:text-gray-100 p-2 rounded-xl hover:bg-gray-800 transition cursor-pointer"
+            className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs sm:text-sm font-bold rounded-lg transition-colors cursor-pointer ml-auto shrink-0"
           >
-            <X className="w-5 h-5" />
+            [닫기]
           </button>
         </div>
 
@@ -858,13 +865,13 @@ export const GroupRulesManagerModal: React.FC<GroupRulesManagerModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setRuleForDetail(null)}
-                  className="text-gray-400 hover:text-gray-100 p-1.5 rounded-lg hover:bg-gray-800 transition cursor-pointer"
+                  className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs sm:text-sm font-bold rounded-lg transition-colors cursor-pointer ml-auto shrink-0"
                 >
-                  <X className="w-5 h-5" />
+                  [닫기]
                 </button>
               </div>
 
-              <div className="py-4 space-y-4 text-xs max-h-[60vh] overflow-y-auto">
+              <div className="py-4 space-y-4 text-xs max-h-[60vh] overflow-y-auto overscroll-contain">
                 {/* 1) 대표거래처 매핑 속성 */}
                 <div className="bg-gray-950 p-3.5 rounded-xl border border-gray-800 space-y-2.5">
                   <div className="text-[11px] font-bold text-violet-400 flex items-center gap-1.5 pb-1.5 border-b border-gray-800">
@@ -1019,7 +1026,7 @@ export const GroupRulesManagerModal: React.FC<GroupRulesManagerModalProps> = ({
         {showConnectedStoresModal && (
           <div 
             id="connectedStoresListModal"
-            className="fixed inset-0 bg-black/85 backdrop-blur-xs z-[360] flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
+            className="fixed inset-0 bg-black/85 backdrop-blur-xs z-[360] flex items-center justify-center p-3 sm:p-5 overflow-y-auto overscroll-contain"
           >
             <div className="bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl border border-violet-700/80 p-5 overflow-hidden animate-in fade-in duration-150 flex flex-col max-h-[88vh]">
               {/* 모달 상단 헤더 */}
@@ -1047,14 +1054,14 @@ export const GroupRulesManagerModal: React.FC<GroupRulesManagerModalProps> = ({
                     setShowConnectedStoresModal(false);
                     cancelInlineEdit();
                   }}
-                  className="text-gray-400 hover:text-gray-100 p-2 rounded-xl hover:bg-gray-800 transition cursor-pointer"
+                  className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs sm:text-sm font-bold rounded-lg transition-colors cursor-pointer ml-auto shrink-0"
                 >
-                  <X className="w-5 h-5" />
+                  [닫기]
                 </button>
               </div>
 
               {/* 연결 거래처 목록 내용 */}
-              <div className="py-4 space-y-3 text-xs overflow-y-auto flex-1 pr-1">
+              <div className="py-4 space-y-3 text-xs overflow-y-auto flex-1 pr-1 overscroll-contain">
                 {mappedRules.length === 0 ? (
                   <div className="py-12 px-4 text-center bg-gray-950 rounded-xl border border-gray-800">
                     <Building2 className="w-10 h-10 text-gray-600 mx-auto mb-2 opacity-60" />

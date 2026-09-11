@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User } from '../types';
 import { sha256, saveUserToFirebase } from '../lib/firebase';
 import { convertKoreanToEnglish } from '../lib/keyboard';
@@ -17,6 +17,13 @@ export const AdminAddModal: React.FC<AdminAddModalProps> = ({
   onClose,
   onAdminCreated
 }) => {
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, []);
+
   const existingAdmins = users.filter(u => u.role === 'admin');
   const hasExistingAdmin = existingAdmins.length > 0;
 
@@ -142,15 +149,15 @@ export const AdminAddModal: React.FC<AdminAddModalProps> = ({
   const isAlreadyLoggedInAdmin = currentUser && currentUser.role === 'admin';
 
   return (
-    <div id="loginAdminAddModal" className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+    <div id="loginAdminAddModal" className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 overflow-y-auto overscroll-contain">
       <div className="w-full max-w-md bg-gray-900 rounded-2xl shadow-2xl p-5 border border-gray-800 my-auto">
         <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-indigo-600" />
             <h3 className="font-bold text-base text-gray-100">관리자 추가</h3>
           </div>
-          <button type="button" onClick={onClose} className="text-gray-500 hover:text-gray-300 p-1">
-            <X className="w-5 h-5" />
+          <button type="button" onClick={onClose} className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs sm:text-sm font-bold rounded-lg transition-colors cursor-pointer ml-auto shrink-0">
+            [닫기]
           </button>
         </div>
 

@@ -19,6 +19,13 @@ export const AiOrderImportModal: React.FC<AiOrderImportModalProps> = ({
   onImportOrders,
   currentUser
 }) => {
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, []);
+
   const defaultStore = currentUser?.role === 'merchant' ? (currentUser?.storeName || currentUser?.name || '') : '';
   const [textInput, setTextInput] = useState('');
   const [parsedRows, setParsedRows] = useState<ParsedOrderItem[]>([]);
@@ -135,14 +142,14 @@ export const AiOrderImportModal: React.FC<AiOrderImportModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-xl transition-colors"
+            className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs sm:text-sm font-bold rounded-lg transition-colors cursor-pointer ml-auto shrink-0"
           >
-            <X className="w-5 h-5" />
+            [닫기]
           </button>
         </div>
 
         {/* Content Body */}
-        <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4">
+        <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4 overscroll-contain">
           
           {/* Grid Layout: Left Input / Right Live Result */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
@@ -181,7 +188,7 @@ export const AiOrderImportModal: React.FC<AiOrderImportModalProps> = ({
                 <span className="text-xs text-gray-500">클릭하여 바로 수정 가능</span>
               </div>
 
-              <div className="w-full h-56 lg:h-80 bg-gray-950 border border-gray-800 rounded-xl overflow-y-auto p-2">
+              <div className="w-full h-56 lg:h-80 bg-gray-950 border border-gray-800 rounded-xl overflow-y-auto p-2 overscroll-contain">
                 {parsedRows.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-gray-600 p-6 text-center">
                     <Zap className="w-8 h-8 mb-2 opacity-30 text-blue-400" />

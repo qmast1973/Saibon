@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Transaction } from '../types';
 import { Trash2, AlertTriangle, CheckCircle2, X, Database, Loader2, Layers, FileSpreadsheet, Download, Upload } from 'lucide-react';
 import { factoryResetDatabase, fullSystemReset, deleteOrderFromFirebase } from '../lib/firebase';
@@ -27,6 +27,13 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
   onBackupDB,
   onRestoreDB
 }) => {
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, []);
+
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [confirmStep, setConfirmStep] = useState<'idle' | 'confirm_factory_reset' | 'confirm_full_reset'>('idle');
@@ -167,14 +174,14 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-500 hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-800 transition"
+            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-bold rounded-lg transition-colors cursor-pointer ml-auto shrink-0"
           >
-            <X className="w-5 h-5" />
+            [닫기]
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+        <div className="p-6 space-y-4 max-h-[80vh] overflow-y-auto overscroll-contain">
           {/* Status Banner */}
           
           {/* Excel & DB Options */}

@@ -381,8 +381,8 @@ export const CollectionList: React.FC<CollectionListProps> = ({
                       수금하기
                     </button>
                   )}
-                  <button type="button" onClick={() => setShowOrderListModal(false)} className={`${mTextIcon} p-1`}>
-                    <X className="w-5 h-5" />
+                  <button type="button" onClick={() => setShowOrderListModal(false)} className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 text-xs sm:text-sm font-bold rounded-lg transition-colors cursor-pointer ml-auto shrink-0">
+                    [닫기]
                   </button>
                 </div>
               </div>

@@ -37,6 +37,13 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
   onOrderCompleted,
   onOpenAiModal
 }) => {
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, []);
+
   const isEditMode = !!editingTransaction;
   const isMerchant = currentUser?.role === 'merchant';
   const isBuyer = currentUser?.role === 'buyer';
@@ -179,7 +186,7 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
   };
 
   return (
-    <div id="entryModal" className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+    <div id="entryModal" className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-3 sm:p-4 overflow-y-auto overscroll-contain">
       <div className="bg-gray-900 rounded-2xl shadow-2xl w-full max-w-xl max-h-[92vh] overflow-hidden border border-gray-800 flex flex-col my-auto">
         
         {/* Header */}
@@ -200,13 +207,13 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
               </button>
             )}
           </div>
-          <button type="button" onClick={onClose} className="text-slate-300 hover:text-white p-1">
-            <X className="w-5 h-5" />
+          <button type="button" onClick={onClose} className="px-3 py-1.5 bg-indigo-800 hover:bg-indigo-700 text-indigo-100 text-xs sm:text-sm font-bold rounded-lg transition-colors cursor-pointer ml-auto shrink-0">
+            [닫기]
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs overflow-y-auto flex-1">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs overflow-y-auto flex-1 overscroll-contain">
           {/* Top Row: Date & Store */}
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -367,7 +374,7 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
               <span className="font-bold text-gray-200">입력된 주문 내역</span>
               <span className="text-indigo-600 font-bold">{validRows.length}건</span>
             </div>
-            <div className="max-h-28 overflow-y-auto space-y-1 text-[11px] text-gray-300">
+            <div className="max-h-28 overflow-y-auto space-y-1 text-[11px] text-gray-300 overscroll-contain">
               {validRows.length > 0 ? (
                 validRows.map((r, i) => (
                   <div key={i} className="flex items-center gap-2 py-0.5 border-b border-gray-800 last:border-b-0">

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { User } from '../types';
 import { Store, X, Phone, MapPin } from 'lucide-react';
 
@@ -13,13 +13,20 @@ export const LocalMerchantInfoModal: React.FC<LocalMerchantInfoModalProps> = ({
   users,
   onClose
 }) => {
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, []);
+
   if (!currentUser || currentUser.role !== 'local') return null;
 
   const assignedUsernames = new Set(currentUser.assignedMerchants || []);
   const merchants = users.filter(u => u.role === 'merchant' && assignedUsernames.has(u.username));
 
   return (
-    <div id="localMerchantInfoModal" className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[225] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+    <div id="localMerchantInfoModal" className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[225] flex items-center justify-center p-3 sm:p-4 overflow-y-auto overscroll-contain">
       <div className="bg-gray-900 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-gray-800 my-auto flex flex-col max-h-[85vh]">
         {/* Header */}
         <div className="bg-emerald-800 text-white px-5 py-4 flex items-center justify-between shrink-0">
@@ -32,13 +39,13 @@ export const LocalMerchantInfoModal: React.FC<LocalMerchantInfoModalProps> = ({
               관리자가 지정한 담당 상인 거래처의 연락처와 매장 주소를 확인합니다.
             </p>
           </div>
-          <button type="button" onClick={onClose} className="text-emerald-100 hover:text-white p-1">
-            <X className="w-5 h-5" />
+          <button type="button" onClick={onClose} className="px-3 py-1.5 bg-emerald-800 hover:bg-emerald-700 text-emerald-100 text-xs sm:text-sm font-bold rounded-lg transition-colors cursor-pointer ml-auto shrink-0">
+            [닫기]
           </button>
         </div>
 
         {/* List */}
-        <div className="p-4 space-y-2.5 overflow-y-auto flex-1 text-xs">
+        <div className="p-4 space-y-2.5 overflow-y-auto flex-1 text-xs overscroll-contain">
           {merchants.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               <Store className="w-8 h-8 text-slate-300 mx-auto mb-2 opacity-50" />

@@ -22,6 +22,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onClose,
   onUserSaved
 }) => {
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, []);
+
   const user = users.find(u => u.username === username);
   const isAdmin = currentUser?.role === 'admin';
   const isSubAdmin = currentUser?.role === 'buyer' && currentUser?.isBuyerAdmin;
@@ -167,7 +174,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   };
 
   return (
-    <div id="profileModal" className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[280] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+    <div id="profileModal" className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[280] flex items-center justify-center p-3 sm:p-4 overflow-y-auto overscroll-contain">
       <div className="bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-gray-800 my-auto flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="bg-indigo-900 text-white px-5 py-4 flex items-center justify-between shrink-0">
@@ -180,13 +187,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               {isEditingOther ? '관리자 권한으로 회원 정보를 수정합니다.' : '회원가입 정보 및 비밀번호를 수정할 수 있습니다.'}
             </p>
           </div>
-          <button type="button" onClick={onClose} className="text-slate-300 hover:text-white p-1">
-            <X className="w-5 h-5" />
+          <button type="button" onClick={onClose} className="px-3 py-1.5 bg-indigo-800 hover:bg-indigo-700 text-indigo-100 text-xs sm:text-sm font-bold rounded-lg transition-colors cursor-pointer ml-auto shrink-0">
+            [닫기]
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSave} className="p-5 space-y-3.5 text-xs overflow-y-auto flex-1">
+        <form onSubmit={handleSave} className="p-5 space-y-3.5 text-xs overflow-y-auto flex-1 overscroll-contain">
           <div>
             <label className="block font-semibold text-gray-200 mb-1">아이디</label>
             <input
@@ -310,7 +317,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   <label className="font-semibold text-gray-200">담당 건물 지정 (서울 사입삼촌)</label>
                   <span className="text-[10px] text-indigo-600 font-bold">{allowedMarkets.length}개 선택</span>
                 </div>
-              <div className="border border-gray-700 rounded-xl p-2 bg-gray-900 max-h-40 overflow-y-auto space-y-1">
+              <div className="border border-gray-700 rounded-xl p-2 bg-gray-900 max-h-40 overflow-y-auto space-y-1 overscroll-contain">
                 {allMarkets.map(m => {
                   if (m === '===== 남대문 =====') {
                     return (
@@ -363,7 +370,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 <label className="font-semibold text-gray-200">담당 상인 거래처 지정</label>
                 <span className="text-[10px] text-emerald-600 font-bold">{assignedMerchants.length}곳 선택</span>
               </div>
-              <div className="border border-gray-700 rounded-xl p-2 bg-gray-900 max-h-40 overflow-y-auto space-y-1">
+              <div className="border border-gray-700 rounded-xl p-2 bg-gray-900 max-h-40 overflow-y-auto space-y-1 overscroll-contain">
                 {merchants.length > 0 ? (
                   merchants.map(m => {
                     const isChecked = assignedMerchants.includes(m.username);

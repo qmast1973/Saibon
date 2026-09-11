@@ -20,6 +20,7 @@ import {
   RotateCcw,
   LogOut,
   LayoutGrid,
+  X,
   Search,
   Filter,
   UserCheck,
@@ -404,7 +405,7 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(
       <div className="max-w-4xl mx-auto">
         
         {/* Top Header & Navigation */}
-        <div className="flex flex-wrap justify-between items-center gap-3 mb-4 pb-3 border-b border-gray-800">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 pb-3 border-b border-gray-800">
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl sm:text-2xl font-black text-blue-400 tracking-tight flex items-center gap-1.5">
@@ -417,7 +418,7 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center sm:justify-end gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto">
             {onOpenAddOrder && (
               <button
                 type="button"
@@ -429,7 +430,6 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(
                 신규 주문 입력
               </button>
             )}
-
             <button
               id="btnTopExportExcel"
               type="button"
@@ -438,28 +438,19 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(
               title="선택한 날짜 엑셀 데이터 저장"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>엑셀데이터 저장</span>
+              <span className="hidden sm:inline">엑셀 저장</span>
+              <span className="sm:hidden">엑셀</span>
             </button>
-
             <button
               type="button"
               onClick={onStartEnteringOrder}
-              className="bg-gray-800 hover:bg-gray-700 active:bg-gray-600 text-gray-200 py-2 px-3 rounded-lg text-xs font-bold border border-gray-700 transition flex items-center gap-1 cursor-pointer"
-              title="달력 화면으로 이동"
+              className="ml-auto sm:ml-0 bg-gray-800 hover:bg-gray-700 active:bg-gray-600 text-gray-200 py-1.5 px-2.5 rounded-lg text-[11px] sm:text-xs font-bold border border-gray-700 transition flex items-center gap-1 cursor-pointer shrink-0"
+              title="닫기 (메인 화면으로)"
             >
-              <LayoutGrid className="w-3.5 h-3.5 text-indigo-400" />
-              장부 달력 보기
+              <X className="w-4 h-4 sm:w-4 sm:h-4 text-gray-400" />
+              <span>닫기</span>
             </button>
-
-            <button
-              type="button"
-              onClick={onLogout}
-              className="bg-gray-900 hover:bg-gray-800 text-gray-400 hover:text-white p-2 rounded-lg border border-gray-800 transition cursor-pointer"
-              title="로그아웃"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          </div>
+</div>
         </div>
 
         {/* Filter Controls (날짜 / 건물 / 층수) */}

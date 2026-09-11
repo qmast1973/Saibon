@@ -360,7 +360,7 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
             </p>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap max-w-full overflow-hidden">
             {isAdmin && (
               <>
                 {onOpenGroupManager && (
@@ -532,8 +532,8 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
                     {entryDate} 기준 수금 등록
                   </p>
                 </div>
-                <button type="button" onClick={() => setShowEntryModal(false)} className="text-gray-500 hover:text-gray-200 p-1">
-                  <X className="w-5 h-5" />
+                <button type="button" onClick={() => setShowEntryModal(false)} className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-800 text-xs sm:text-sm font-bold rounded-lg transition-colors cursor-pointer ml-auto shrink-0">
+                  [닫기]
                 </button>
               </div>
 
