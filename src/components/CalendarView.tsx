@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { Transaction, User, CollectionGroupRule } from '../types';
 import { formatMoney, normalizeDateStr } from '../lib/firebase';
-import { getCollectionBillingStore } from '../lib/groupRules';
-import { ChevronLeft, ChevronRight, CalendarCheck, Plus, Edit, Trash2, CheckCircle2, Sparkles, Layers } from 'lucide-react';
+import { getCollectionBillingStore, sortTransactionsBySubStoreClick } from '../lib/groupRules';
+import { ChevronLeft, ChevronRight, CalendarCheck, Plus, Edit, Trash2, CheckCircle2, Sparkles, Layers, X } from 'lucide-react';
 
 interface CalendarViewProps {
   currentDate: Date;
@@ -40,6 +40,7 @@ export const CalendarView: React.FC<CalendarViewProps> = React.memo(({
   onOpenWorkdayStats
 }) => {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [selectedSubSortStore, setSelectedSubSortStore] = useState<string | null>(null);
 
 
   const isMerchant = currentUser?.role === 'merchant';
@@ -75,10 +76,14 @@ export const CalendarView: React.FC<CalendarViewProps> = React.memo(({
     return map;
   }, [transactions]);
 
-  // Selected Day Transactions - Memoized
+  // Selected Day Transactions - Memoized (종속거래처 클릭 시 정렬 지원)
   const dayTxs = useMemo(() => {
-    return transactions.filter(t => (t.date || normalizeDateStr(t.businessDate)) === selectedDateStr);
-  }, [transactions, selectedDateStr]);
+    const raw = transactions.filter(t => (t.date || normalizeDateStr(t.businessDate)) === selectedDateStr);
+    if (selectedSubSortStore) {
+      return sortTransactionsBySubStoreClick(raw, selectedSubSortStore, collectionGroupRules);
+    }
+    return raw;
+  }, [transactions, selectedDateStr, selectedSubSortStore, collectionGroupRules]);
 
   const financialDayTxs = useMemo(() => {
     return dayTxs.filter(t => t.recordType !== 'receivable');
@@ -269,6 +274,27 @@ export const CalendarView: React.FC<CalendarViewProps> = React.memo(({
           </div>
         </div>
 
+        {/* Subordinate Store Sort Info Banner */}
+        {selectedSubSortStore && (
+          <div className="mb-2.5 p-2 rounded-xl bg-violet-50 border border-violet-200 flex items-center justify-between text-xs animate-fadeIn">
+            <div className="flex items-center gap-1.5 text-violet-900 font-bold min-w-0">
+              <Layers className="w-3.5 h-3.5 text-violet-600 shrink-0" />
+              <span className="truncate">
+                '{selectedSubSortStore}' 연계 그룹 최상단 정렬 (1순위: 대표그룹, 2순위: 상호 가나다순)
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedSubSortStore(null)}
+              className="text-violet-600 hover:text-violet-800 p-1 rounded-md hover:bg-violet-100 transition shrink-0 flex items-center gap-0.5 text-[11px] font-bold"
+              title="정렬 해제"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>해제</span>
+            </button>
+          </div>
+        )}
+
         {/* Selected Day Transaction Items */}
         <div id="dayTransactionsList" className="flex-1 overflow-y-auto space-y-2.5 max-h-[500px] pr-1">
           {dayTxs.length === 0 ? (
@@ -288,25 +314,35 @@ export const CalendarView: React.FC<CalendarViewProps> = React.memo(({
               const isCompleted = (t.status || '').trim() === '완료';
               const repStore = collectionGroupRules.length > 0 ? getCollectionBillingStore(t.store, collectionGroupRules) : '';
               const isSubordinate = repStore && repStore !== t.store;
+              const isStoreActiveInSort = selectedSubSortStore === t.store || selectedSubSortStore === repStore;
 
               return (
                 <div
                   key={t.id}
                   className={`p-3 rounded-xl border text-xs flex flex-col gap-1.5 transition ${
                     isCompleted ? 'bg-emerald-50/40 border-emerald-200' : 'bg-slate-50 hover:bg-slate-100/80 border-slate-200'
-                  }`}
+                  } ${isStoreActiveInSort ? 'ring-2 ring-violet-400/50' : ''}`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-bold text-slate-800 text-sm">{t.store || '미지정 상호'}</span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedSubSortStore(prev => prev === t.store ? null : t.store)}
+                        className="font-bold text-slate-800 text-sm hover:text-indigo-600 hover:underline transition cursor-pointer text-left"
+                        title="클릭 시 이 거래처 및 연계 그룹 최상단 정렬"
+                      >
+                        {t.store || '미지정 상호'}
+                      </button>
                       {isSubordinate && (
-                        <span 
-                          className="bg-violet-100 text-violet-800 border border-violet-200 text-[10px] px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5 shadow-2xs" 
-                          title={`대표 거래처: ${repStore}`}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedSubSortStore(prev => prev === t.store ? null : t.store)}
+                          className="bg-violet-100 hover:bg-violet-200 text-violet-800 border border-violet-200 text-[10px] px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5 shadow-2xs transition cursor-pointer" 
+                          title={`대표 거래처: ${repStore} (클릭 시 대표그룹 최상단 정렬)`}
                         >
                           <Layers className="w-2.5 h-2.5 text-violet-600" />
                           <span>대표: {repStore}</span>
-                        </span>
+                        </button>
                       )}
                       {t.manager && (
                         <span className="bg-indigo-100 text-indigo-800 text-[10px] px-1.5 py-0.5 rounded font-semibold">

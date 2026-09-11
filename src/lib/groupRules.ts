@@ -95,8 +95,8 @@ export const getGroupSubordinateStores = (
  * Checks if a transaction matches a search query with full group-awareness.
  * 
  * - If the query matches a representative store (e.g., "호치키스"),
- *   ALL orders belonging to "호치키스" AND its subordinate stores ("호치상남", "호치창동" 등) MATCH.
- * - If the query matches a subordinate store name (e.g., "호치상남"), it matches.
+ *   ALL orders belonging to "호치키스" AND its subordinate stores ("호치", "호치겔러리" 등) MATCH.
+ * - If the query matches a subordinate store name (e.g., "호치"), it matches.
  * - Standard order properties (상가, 층, 호, 비고, 담당자 등) are also matched.
  * - Supports Korean initials (초성 검색: "ㅎㅊㅋㅅ" -> "호치키스") and whitespace insensitivity.
  */
@@ -111,13 +111,14 @@ export const matchesTransactionWithGroup = (
   const cleanQ = normalizeStoreName(rawQ);
   const qInitials = getKoreanInitials(rawQ).replace(/\s+/g, '').toLowerCase();
 
-  const store = String(t.store || '').trim();
+  const store = String(t.store || (t as any)._store || '').trim();
   const cleanStore = normalizeStoreName(store);
   const storeInitials = getKoreanInitials(store).replace(/\s+/g, '').toLowerCase();
 
   // 1. Direct Store Name match
   if (
     cleanStore.includes(cleanQ) ||
+    cleanQ.includes(cleanStore) ||
     storeInitials.includes(qInitials) ||
     store.toLowerCase().includes(rawQ.toLowerCase())
   ) {
@@ -125,12 +126,13 @@ export const matchesTransactionWithGroup = (
   }
 
   // 2. Representative Store (Billing Store) match
-  const billingStore = getCollectionBillingStore(store, rules);
+  const billingStore = (t as any)._billingStore || getCollectionBillingStore(store, rules);
   const cleanBillingStore = normalizeStoreName(billingStore);
   const billingStoreInitials = getKoreanInitials(billingStore).replace(/\s+/g, '').toLowerCase();
 
   if (
     cleanBillingStore.includes(cleanQ) ||
+    cleanQ.includes(cleanBillingStore) ||
     billingStoreInitials.includes(qInitials) ||
     billingStore.toLowerCase().includes(rawQ.toLowerCase())
   ) {
@@ -145,6 +147,7 @@ export const matchesTransactionWithGroup = (
     const rGroupInitials = getKoreanInitials(r.groupName).replace(/\s+/g, '').toLowerCase();
     return (
       rGroupClean.includes(cleanQ) ||
+      cleanQ.includes(rGroupClean) ||
       rGroupInitials.includes(qInitials) ||
       r.groupName.toLowerCase().includes(rawQ.toLowerCase())
     );
@@ -166,7 +169,18 @@ export const matchesTransactionWithGroup = (
     if (belongsToMatchedGroup) return true;
   }
 
-  // 4. Other transaction fields match (초성 및 공백 무시 지원)
+  // 4. Also check if the query matches any subordinate store belonging to this transaction's representative group
+  if (cleanBillingStore) {
+    const subStores = getSubStoresForRepresentative(billingStore, rules);
+    const matchesAnySub = subStores.some(sub => {
+      const cleanSub = normalizeStoreName(sub);
+      const subInitials = getKoreanInitials(sub).replace(/\s+/g, '').toLowerCase();
+      return cleanSub.includes(cleanQ) || cleanQ.includes(cleanSub) || subInitials.includes(qInitials);
+    });
+    if (matchesAnySub) return true;
+  }
+
+  // 5. Other transaction fields match (초성 및 공백 무시 지원)
   const combined = `${t.room || ''} ${t.floor || ''} ${t.manager || ''} ${t.localManager || ''} ${t.actualManager || ''} ${t.assignedManager || ''} ${t.market || ''} ${t.region || ''} ${t.status || ''} ${t.remark || ''} ${t.processingRemark || ''}`.toLowerCase();
   
   if (combined.includes(rawQ.toLowerCase())) return true;
@@ -174,4 +188,211 @@ export const matchesTransactionWithGroup = (
   if (qInitials && getKoreanInitials(combined).replace(/\s+/g, '').includes(qInitials)) return true;
 
   return false;
+};
+
+/**
+ * 리스트 내 종속거래처 클릭 시 정렬(Grouping/Sorting)
+ * 
+ * - 1순위: 동일한 대표거래처로 묶인 데이터들을 최상단으로 그룹화.
+ * - 2순위: 그 안에서 동일한 개별 상호명끼리 모이도록 오름차순(가나다순) 정렬 처리.
+ * - 나머지 데이터들: 대표거래처별 가나다순 -> 개별 상호명 가나다순으로 정렬.
+ */
+export const sortTransactionsBySubStoreClick = (
+  transactions: Transaction[],
+  clickedStore: string | null,
+  rules: CollectionGroupRule[] = []
+): Transaction[] => {
+  if (!clickedStore || !clickedStore.trim()) {
+    return transactions;
+  }
+
+  const targetRepresentative = normalizeStoreName(getCollectionBillingStore(clickedStore, rules));
+
+  return [...transactions].sort((a, b) => {
+    const aStore = String(a.store || (a as any)._store || '').trim();
+    const bStore = String(b.store || (b as any)._store || '').trim();
+
+    const aRep = normalizeStoreName((a as any)._billingStore || getCollectionBillingStore(aStore, rules));
+    const bRep = normalizeStoreName((b as any)._billingStore || getCollectionBillingStore(bStore, rules));
+
+    const aMatchesRep = aRep === targetRepresentative;
+    const bMatchesRep = bRep === targetRepresentative;
+
+    // 1순위: 동일한 대표거래처로 묶인 데이터들을 최상단으로 그룹화
+    if (aMatchesRep && !bMatchesRep) return -1;
+    if (!aMatchesRep && bMatchesRep) return 1;
+
+    // 2순위: 그 안에서 동일한 개별 상호명끼리 모이도록 오름차순(가나다순) 정렬 처리
+    const storeCompare = aStore.localeCompare(bStore, 'ko');
+    if (storeCompare !== 0) return storeCompare;
+
+    // 3순위: 날짜/시간 역순
+    const aDate = String(a.date || a.businessDate || '');
+    const bDate = String(b.date || b.businessDate || '');
+    return bDate.localeCompare(aDate);
+  });
+};
+
+/**
+ * Returns strictly subordinate store names (excluding groupName itself) for a representative group.
+ */
+export const getSubStoresForRepresentative = (
+  groupName: string,
+  rules: CollectionGroupRule[] = []
+): string[] => {
+  const cleanGroup = normalizeStoreName(groupName);
+  const subStores = new Set<string>();
+
+  (rules || []).forEach(r => {
+    if (!r || !r.groupName || !r.storeName) return;
+    if (normalizeStoreName(r.groupName) === cleanGroup) {
+      const cleanSub = normalizeStoreName(r.storeName);
+      if (cleanSub !== cleanGroup) {
+        subStores.add(r.storeName.trim());
+      }
+    }
+  });
+
+  return Array.from(subStores);
+};
+
+export interface GroupSearchSuggestion {
+  type: 'group' | 'subordinate' | 'general';
+  name: string;
+  representativeName: string;
+  subStores: string[];
+}
+
+/**
+ * Generates search suggestions for search inputs based on collectionGroupRules and known stores.
+ */
+export const getGroupSearchSuggestions = (
+  query: string,
+  rules: CollectionGroupRule[] = [],
+  knownStores: string[] = []
+): GroupSearchSuggestion[] => {
+  const rawQ = String(query || '').trim();
+  if (!rawQ) return [];
+
+  const cleanQ = normalizeStoreName(rawQ);
+  const qInitials = getKoreanInitials(rawQ).replace(/\s+/g, '').toLowerCase();
+
+  const results: GroupSearchSuggestion[] = [];
+  const added = new Set<string>();
+
+  // 1. Check representative groups
+  const allGroupNames = Array.from(new Set(
+    (rules || []).map(r => (r.groupName || '').trim()).filter(Boolean)
+  ));
+
+  allGroupNames.forEach(groupName => {
+    const cleanG = normalizeStoreName(groupName);
+    const gInitials = getKoreanInitials(groupName).replace(/\s+/g, '').toLowerCase();
+    const subStores = getSubStoresForRepresentative(groupName, rules);
+
+    const matchesGroup = cleanG.includes(cleanQ) || 
+      gInitials.includes(qInitials) || 
+      groupName.toLowerCase().includes(rawQ.toLowerCase());
+
+    const matchedSub = subStores.find(sub => {
+      const cleanSub = normalizeStoreName(sub);
+      const subInitials = getKoreanInitials(sub).replace(/\s+/g, '').toLowerCase();
+      return cleanSub.includes(cleanQ) || subInitials.includes(qInitials) || sub.toLowerCase().includes(rawQ.toLowerCase());
+    });
+
+    if (matchesGroup || matchedSub) {
+      const key = `group:${groupName}`;
+      if (!added.has(key)) {
+        added.add(key);
+        results.push({
+          type: 'group',
+          name: groupName,
+          representativeName: groupName,
+          subStores
+        });
+      }
+    }
+  });
+
+  // 2. Check subordinate stores
+  (rules || []).forEach(r => {
+    if (!r || !r.storeName || !r.groupName) return;
+    const storeName = r.storeName.trim();
+    const groupName = r.groupName.trim();
+    if (normalizeStoreName(storeName) === normalizeStoreName(groupName)) return;
+
+    const cleanS = normalizeStoreName(storeName);
+    const sInitials = getKoreanInitials(storeName).replace(/\s+/g, '').toLowerCase();
+
+    if (cleanS.includes(cleanQ) || sInitials.includes(qInitials) || storeName.toLowerCase().includes(rawQ.toLowerCase())) {
+      const key = `sub:${storeName}`;
+      if (!added.has(key)) {
+        added.add(key);
+        results.push({
+          type: 'subordinate',
+          name: storeName,
+          representativeName: groupName,
+          subStores: [storeName]
+        });
+      }
+    }
+  });
+
+  // 3. Known stores matching
+  knownStores.forEach(store => {
+    const s = store.trim();
+    if (!s) return;
+    const cleanS = normalizeStoreName(s);
+    const sInitials = getKoreanInitials(s).replace(/\s+/g, '').toLowerCase();
+
+    if (cleanS.includes(cleanQ) || sInitials.includes(qInitials) || s.toLowerCase().includes(rawQ.toLowerCase())) {
+      const rep = getCollectionBillingStore(s, rules);
+      const subStores = rep !== s ? getSubStoresForRepresentative(rep, rules) : [];
+      const key = `store:${s}`;
+      if (!added.has(key) && !added.has(`group:${s}`) && !added.has(`sub:${s}`)) {
+        added.add(key);
+        results.push({
+          type: rep !== s ? 'subordinate' : 'general',
+          name: s,
+          representativeName: rep,
+          subStores
+        });
+      }
+    }
+  });
+
+  return results.slice(0, 10);
+};
+
+/**
+ * Sorts StoreGroup items when a specific subordinate store is clicked.
+ * - 1st priority: The group belonging to the same representative store comes to the top.
+ * - 2nd priority: Alphabetical order by store name.
+ */
+export const sortStoreGroupsBySubStoreClick = <T extends { store: string }>(
+  groups: T[],
+  clickedStore: string | null,
+  rules: CollectionGroupRule[] = []
+): T[] => {
+  if (!clickedStore || !clickedStore.trim()) {
+    return groups;
+  }
+
+  const targetRepresentative = normalizeStoreName(getCollectionBillingStore(clickedStore, rules));
+
+  return [...groups].sort((a, b) => {
+    const aStore = String(a.store || '').trim();
+    const bStore = String(b.store || '').trim();
+
+    const aRep = normalizeStoreName(getCollectionBillingStore(aStore, rules));
+    const bRep = normalizeStoreName(getCollectionBillingStore(bStore, rules));
+
+    const aMatches = aRep === targetRepresentative || normalizeStoreName(aStore) === targetRepresentative;
+    const bMatches = bRep === targetRepresentative || normalizeStoreName(bStore) === targetRepresentative;
+
+    if (aMatches && !bMatches) return -1;
+    if (!aMatches && bMatches) return 1;
+
+    return aStore.localeCompare(bStore, 'ko');
+  });
 };

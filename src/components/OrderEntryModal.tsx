@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Transaction, User } from '../types';
+import { Transaction, User, CollectionGroupRule } from '../types';
 import { saveOrderToFirebase, normalizeMarketName } from '../lib/firebase';
+import { SearchWithGroupDropdown } from './SearchWithGroupDropdown';
 import { Plus, Trash2, Edit3, X, Check, Sparkles } from 'lucide-react';
 
 interface OrderEntryModalProps {
@@ -10,6 +11,7 @@ interface OrderEntryModalProps {
   stores: string[];
   allMarkets: string[];
   bundledStores?: string[];
+  collectionGroupRules?: CollectionGroupRule[];
   onClose: () => void;
   onOrderSaved: (savedOrders: Transaction[]) => void;
   onOrderCompleted?: (transactionId: string) => void;
@@ -29,6 +31,7 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
   stores,
   allMarkets,
   bundledStores = [],
+  collectionGroupRules = [],
   onClose,
   onOrderSaved,
   onOrderCompleted,
@@ -256,22 +259,26 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
                     ))}
                   </div>
                 </div>
+              ) : ((isRegularBuyer && isEditMode) || (isMerchant && !!currentUser?.storeName)) ? (
+                <input
+                  type="text"
+                  required
+                  value={store}
+                  disabled
+                  className="w-full border border-gray-700 rounded-xl p-2.5 bg-gray-950 text-gray-300 cursor-not-allowed outline-none font-bold"
+                />
               ) : (
-                <>
-                  <input
-                    type="text"
-                    required
-                    list="storeDatalist"
-                    value={store}
-                    disabled={(isRegularBuyer && isEditMode) || (isMerchant && !!currentUser?.storeName)}
-                    onChange={(e) => setStore(e.target.value)}
-                    placeholder="상호명을 입력하세요"
-                    className={`w-full border border-gray-700 rounded-xl p-2.5 bg-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none ${((isRegularBuyer && isEditMode) || (isMerchant && !!currentUser?.storeName)) ? 'bg-gray-950 cursor-not-allowed' : 'focus:bg-gray-900'}`}
-                  />
-                  <datalist id="storeDatalist">
-                    {stores.map(s => <option key={s} value={s} />)}
-                  </datalist>
-                </>
+                <SearchWithGroupDropdown
+                  value={store}
+                  onChange={setStore}
+                  placeholder="상호명을 입력하세요 (초성/대표거래처 가능)"
+                  collectionGroupRules={collectionGroupRules}
+                  knownStores={stores}
+                  theme="dark"
+                  required
+                  className="relative w-full"
+                  inputClassName="w-full border border-gray-700 rounded-xl pl-8 pr-7 p-2.5 bg-gray-900 text-gray-100 focus:ring-2 focus:ring-indigo-500 outline-none text-xs"
+                />
               )}
             </div>
           </div>

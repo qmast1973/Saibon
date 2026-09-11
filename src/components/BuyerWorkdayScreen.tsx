@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
-import { Transaction, User, CollectionGroupRule } from '../types';
+import { Transaction, User } from '../types';
 import {
   normalizeMarketName,
   normalizeFloorValue,
@@ -9,7 +9,7 @@ import {
   rtdb,
   formatMoney
 } from '../lib/firebase';
-import { matchesTransactionWithGroup, getCollectionBillingStore } from '../lib/groupRules';
+import { getKoreanInitials } from '../lib/groupRules';
 import {
   Building2,
   Calendar,
@@ -31,7 +31,7 @@ import {
 interface BuyerWorkdayScreenProps {
   currentUser: User;
   transactions: Transaction[];
-  collectionGroupRules?: CollectionGroupRule[];
+  collectionGroupRules?: any[];
   selectedDateStr: string;
   onSelectDateStr: (date: string) => void;
   onLogout: () => void;
@@ -44,7 +44,6 @@ interface BuyerWorkdayScreenProps {
 export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(({
   currentUser,
   transactions,
-  collectionGroupRules = [],
   selectedDateStr,
   onSelectDateStr,
   onLogout,
@@ -143,7 +142,22 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(
     }
 
     if (searchQuery.trim()) {
-      list = list.filter(item => matchesTransactionWithGroup(item, searchQuery, collectionGroupRules || []));
+      const q = searchQuery.trim().toLowerCase();
+      const qInit = getKoreanInitials(q).replace(/\s+/g, '');
+      list = list.filter(item => {
+        const store = String(item.store || '').toLowerCase();
+        const storeInit = getKoreanInitials(store).replace(/\s+/g, '');
+        const room = String(item.room || '').toLowerCase();
+        const memo = String(item.memo || '').toLowerCase();
+        const itemText = String(item.item || '').toLowerCase();
+        return (
+          store.includes(q) ||
+          (qInit && storeInit.includes(qInit)) ||
+          room.includes(q) ||
+          memo.includes(q) ||
+          itemText.includes(q)
+        );
+      });
     }
 
     return list.sort((a, b) => {
@@ -159,7 +173,7 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(
       const rB = String(b.room || '');
       return rA.localeCompare(rB, 'ko', { numeric: true });
     });
-  }, [dateOrders, selectedBuilding, selectedFloor, statusFilter, searchQuery, collectionGroupRules]);
+  }, [dateOrders, selectedBuilding, selectedFloor, statusFilter, searchQuery]);
 
   // Create scopeOrders that ignores statusFilter for top stats, but includes searchQuery
   const scopeOrders = useMemo(() => {
@@ -177,11 +191,26 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(
     }
 
     if (searchQuery.trim()) {
-      list = list.filter(item => matchesTransactionWithGroup(item, searchQuery, collectionGroupRules || []));
+      const q = searchQuery.trim().toLowerCase();
+      const qInit = getKoreanInitials(q).replace(/\s+/g, '');
+      list = list.filter(item => {
+        const store = String(item.store || '').toLowerCase();
+        const storeInit = getKoreanInitials(store).replace(/\s+/g, '');
+        const room = String(item.room || '').toLowerCase();
+        const memo = String(item.memo || '').toLowerCase();
+        const itemText = String(item.item || '').toLowerCase();
+        return (
+          store.includes(q) ||
+          (qInit && storeInit.includes(qInit)) ||
+          room.includes(q) ||
+          memo.includes(q) ||
+          itemText.includes(q)
+        );
+      });
     }
     
     return list;
-  }, [dateOrders, selectedBuilding, selectedFloor, searchQuery, collectionGroupRules]);
+  }, [dateOrders, selectedBuilding, selectedFloor, searchQuery]);
 
   // Workday stats calculated with user's specific business rules:
   const workdayStats = useMemo(() => {
@@ -500,7 +529,7 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="상호/대표거래처/호수/메모 검색 (초성 가능)"
+                  placeholder="상호/호수/메모 검색 (초성 가능)"
                   className="w-full bg-gray-800 text-white border border-gray-700 rounded-lg pl-7 pr-3 py-1.5 text-xs outline-none focus:ring-1 focus:ring-blue-500 placeholder-gray-500"
                 />
                 <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2 top-1/2 -translate-y-1/2" />
@@ -602,22 +631,6 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(
                           <h2 className="text-lg sm:text-xl font-black text-white tracking-wide break-keep shrink-0">
                             {order.store || '상호 미등록'}
                           </h2>
-                          {(() => {
-                            const repStore = (collectionGroupRules && collectionGroupRules.length > 0)
-                              ? getCollectionBillingStore(order.store || '', collectionGroupRules)
-                              : '';
-                            const isSubordinate = repStore && repStore !== order.store;
-                            if (!isSubordinate) return null;
-                            return (
-                              <span 
-                                className="text-[11px] text-violet-200 bg-violet-950/90 border border-violet-700/80 px-2 py-0.5 rounded-md font-bold shrink-0 mt-0.5 sm:mt-0 flex items-center gap-1 shadow-2xs"
-                                title={`대표거래처: ${repStore}`}
-                              >
-                                <Layers className="w-3 h-3 text-violet-400" />
-                                대표: {repStore}
-                              </span>
-                            );
-                          })()}
                           {order.region && (
                             <span className="text-[11px] text-violet-300 bg-violet-900/60 border border-violet-700/60 px-2 py-0.5 rounded-md font-bold shrink-0 mt-0.5 sm:mt-0">
                               {order.region}

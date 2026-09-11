@@ -54,6 +54,7 @@ const ExcelImportWizard = lazy(() => import('./components/ExcelImportWizard').th
 const LocalMerchantInfoModal = lazy(() => import('./components/LocalMerchantInfoModal').then(module => ({ default: module.LocalMerchantInfoModal })));
 const DataManagementModal = lazy(() => import('./components/DataManagementModal').then(module => ({ default: module.DataManagementModal })));
 import { BuildingManagerModal } from './components/BuildingManagerModal';
+import { SearchWithGroupDropdown } from './components/SearchWithGroupDropdown';
 import { matchesTransactionWithGroup } from './lib/groupRules';
 
 import { Search, Layers } from 'lucide-react';
@@ -1016,16 +1017,16 @@ export default function App() {
 
         {/* Search Bar */}
         <section className="bg-gray-900 p-2 sm:p-2.5 rounded-2xl shadow-xs border border-gray-800 flex items-center justify-between gap-2.5 text-xs">
-          <div className="relative flex-1 max-w-md">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="상호, 대표거래처, 건물, 비고, 담당자 검색 (초성 가능: ㅎㅊㅋㅅ)..."
-              className="border border-gray-700 rounded-xl pl-8 pr-3 py-1.5 bg-gray-900 w-full outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-gray-900 text-xs text-gray-100 placeholder:text-gray-500"
-            />
-            <Search className="w-3.5 h-3.5 text-gray-500 absolute left-2.5 top-2" />
-    </div>
+          <SearchWithGroupDropdown
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="상호, 대표거래처, 건물, 비고, 담당자 검색 (초성 가능: ㅎㅊㅋㅅ)..."
+            collectionGroupRules={collectionGroupRules}
+            knownStores={stores}
+            theme="dark"
+            className="relative flex-1 max-w-md"
+            inputClassName="border border-gray-700 rounded-xl pl-8 pr-7 py-1.5 bg-gray-900 w-full outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-gray-900 text-xs text-gray-100 placeholder:text-gray-500"
+          />
 
           {searchQuery && (
             <button
@@ -1188,6 +1189,7 @@ export default function App() {
           stores={stores}
           allMarkets={currentUser?.role === 'buyer' && !currentUser.isBuyerAdmin ? (currentUser.allowedMarkets || []).map(normalizeMarketName) : allMarkets}
           bundledStores={merchantBundledStores}
+          collectionGroupRules={collectionGroupRules}
           onClose={() => {
             setShowOrderModal(false);
             setEditingTransaction(null);

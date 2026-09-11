@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { Transaction, User, CollectionGroupRule } from '../types';
 import { CollectionList } from './CollectionList';
+import { SearchWithGroupDropdown } from './SearchWithGroupDropdown';
 import {
   normalizeMarketName,
   normalizeFloorValue,
@@ -536,16 +537,16 @@ export const BuyerWorkdayStatsScreen: React.FC<BuyerWorkdayStatsScreenProps> = R
               <label className="block text-xs font-bold text-gray-400 mb-1 flex items-center gap-1">
                 <Search className="w-3.5 h-3.5 text-blue-400" /> 검색
               </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="상호/대표거래처/호수/메모 검색 (초성 가능)"
-                  className="w-full bg-gray-800 text-white border border-gray-700 rounded-lg pl-7 pr-3 py-1.5 text-xs outline-none focus:ring-1 focus:ring-blue-500 placeholder-gray-500"
-                />
-                <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2 top-1/2 -translate-y-1/2" />
-              </div>
+              <SearchWithGroupDropdown
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="상호/대표거래처/호수/메모 검색 (초성 가능)"
+                collectionGroupRules={collectionGroupRules || []}
+                knownStores={Array.from(new Set(dateOrders.map(t => t.store).filter(Boolean)))}
+                theme="dark"
+                className="relative"
+                inputClassName="w-full bg-gray-800 text-white border border-gray-700 rounded-lg pl-7 pr-7 py-1.5 text-xs outline-none focus:ring-1 focus:ring-blue-500 placeholder-gray-500"
+              />
             </div>
           </div>
         </div>
@@ -662,6 +663,8 @@ export const BuyerWorkdayStatsScreen: React.FC<BuyerWorkdayStatsScreenProps> = R
         
         <CollectionList 
           groups={groups} 
+          allTransactions={filteredOrders}
+          collectionGroupRules={collectionGroupRules || []}
           mode="stats" 
           theme="dark" 
           onOpenOrderDetail={onOpenOrder}

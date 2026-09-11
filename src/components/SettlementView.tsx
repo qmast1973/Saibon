@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { Transaction, CollectionGroupRule } from '../types';
 import { formatMoney, normalizeMarketName } from '../lib/firebase';
-import { getCollectionBillingStore, matchesTransactionWithGroup } from '../lib/groupRules';
-import { HandCoins, Search, ChevronDown, ChevronUp, Layers, Store } from 'lucide-react';
+import { getCollectionBillingStore, matchesTransactionWithGroup, getSubStoresForRepresentative, normalizeStoreName } from '../lib/groupRules';
+import { SearchWithGroupDropdown } from './SearchWithGroupDropdown';
+import { HandCoins, Search, ChevronDown, ChevronUp, Layers, Store, CornerDownRight, ArrowDownAZ, X } from 'lucide-react';
 
 interface SettlementViewProps {
   transactions: Transaction[];
@@ -20,10 +21,16 @@ export const SettlementView: React.FC<SettlementViewProps> = ({
   const [search, setSearch] = useState('');
   const [regionFilter, setRegionFilter] = useState('');
   const [managerFilter, setManagerFilter] = useState('');
+  const [selectedSubSortStore, setSelectedSubSortStore] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [expandedSubStores, setExpandedSubStores] = useState<Record<string, boolean>>({});
 
   const toggleGroup = (key: string) => {
     setExpandedGroups(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const toggleSubStore = (storeKey: string) => {
+    setExpandedSubStores(prev => ({ ...prev, [storeKey]: !prev[storeKey] }));
   };
 
   const getKoreanInitials = (value: string) => {
@@ -112,8 +119,17 @@ export const SettlementView: React.FC<SettlementViewProps> = ({
       g.stores.set(bStore, prev);
     });
 
-    return [...groupMap.values()].sort((a, b) => (b.expense - b.income) - (a.expense - a.income));
-  }, [filtered]);
+    return [...groupMap.values()].sort((a, b) => {
+      if (selectedSubSortStore) {
+        const targetRep = normalizeStoreName(getCollectionBillingStore(selectedSubSortStore, collectionGroupRules || []));
+        const aHasRep = [...a.stores.keys()].some(s => normalizeStoreName(s) === targetRep);
+        const bHasRep = [...b.stores.keys()].some(s => normalizeStoreName(s) === targetRep);
+        if (aHasRep && !bHasRep) return -1;
+        if (!aHasRep && bHasRep) return 1;
+      }
+      return (b.expense - b.income) - (a.expense - a.income);
+    });
+  }, [filtered, selectedSubSortStore, collectionGroupRules]);
 
   return (
     <section id="settlementViewSection" className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 flex flex-col">
@@ -143,18 +159,38 @@ export const SettlementView: React.FC<SettlementViewProps> = ({
         </div>
       </div>
 
+      {/* Subordinate Store Sort Active Banner */}
+      {selectedSubSortStore && (
+        <div className="mb-3 p-2.5 rounded-xl bg-violet-50 border border-violet-200 flex items-center justify-between text-xs animate-fadeIn shadow-2xs">
+          <div className="flex items-center gap-2 font-bold text-violet-900 min-w-0">
+            <ArrowDownAZ className="w-4 h-4 text-violet-600 shrink-0" />
+            <span className="truncate">
+              종속거래처 <span className="underline decoration-violet-400">'{selectedSubSortStore}'</span> 기준 정렬 (1순위: 동일 대표거래처 최상단, 2순위: 상호 오름차순)
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSelectedSubSortStore(null)}
+            className="px-2 py-1 rounded-md text-xs font-bold transition flex items-center gap-1 shrink-0 text-violet-700 hover:bg-violet-200"
+          >
+            <X className="w-3.5 h-3.5" />
+            정렬 해제
+          </button>
+        </div>
+      )}
+
       {/* Filters */}
       <div className="flex gap-2 mb-4 flex-wrap">
-        <div className="relative flex-1 min-w-[200px]">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full border border-slate-300 rounded-xl pl-8 pr-3 py-2 text-xs bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
-            placeholder="거래처 검색 (초성 검색 가능: ㄱㄹㄷ)"
-          />
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
-        </div>
+        <SearchWithGroupDropdown
+          value={search}
+          onChange={setSearch}
+          placeholder="거래처/대표거래처 검색 (초성 검색 가능: ㄱㄹㄷ)"
+          collectionGroupRules={collectionGroupRules}
+          knownStores={Array.from(new Set(rows.map(t => t._store).filter(Boolean)))}
+          theme="light"
+          className="relative flex-1 min-w-[200px]"
+          inputClassName="w-full border border-slate-300 rounded-xl pl-8 pr-7 py-2 text-xs bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white text-slate-800 placeholder-slate-400"
+        />
         <select
           value={regionFilter}
           onChange={(e) => setRegionFilter(e.target.value)}
@@ -184,7 +220,21 @@ export const SettlementView: React.FC<SettlementViewProps> = ({
             const key = `${g.region}___${g.manager}`;
             const isExpanded = !!expandedGroups[key];
             const due = Math.max(0, g.expense - g.income);
-            const storeList = [...g.stores.entries()].sort((a, b) => (b[1].expense - b[1].income) - (a[1].expense - a[1].income));
+            const storeList = [...g.stores.entries()].sort((a, b) => {
+              if (selectedSubSortStore) {
+                const aStore = a[0];
+                const bStore = b[0];
+                const aRep = normalizeStoreName(getCollectionBillingStore(aStore, collectionGroupRules || []));
+                const bRep = normalizeStoreName(getCollectionBillingStore(bStore, collectionGroupRules || []));
+                const targetRep = normalizeStoreName(getCollectionBillingStore(selectedSubSortStore, collectionGroupRules || []));
+                const aMatches = aRep === targetRep || normalizeStoreName(aStore) === targetRep;
+                const bMatches = bRep === targetRep || normalizeStoreName(bStore) === targetRep;
+                if (aMatches && !bMatches) return -1;
+                if (!aMatches && bMatches) return 1;
+                return aStore.localeCompare(bStore, 'ko');
+              }
+              return (b[1].expense - b[1].income) - (a[1].expense - a[1].income);
+            });
 
             return (
               <div key={idx} className="bg-white">
@@ -217,19 +267,84 @@ export const SettlementView: React.FC<SettlementViewProps> = ({
                     <div className="divide-y divide-slate-200 border border-slate-200 rounded-xl bg-white overflow-hidden">
                       {storeList.map(([bStore, data]) => {
                         const storeDue = Math.max(0, data.expense - data.income);
+                        const ruleSubStores = getSubStoresForRepresentative(bStore, collectionGroupRules || []);
+                        const rawStoreList = Array.from(data.rawStores).map(s => String(s || '')).filter(s => s && s.toLowerCase() !== bStore.toLowerCase());
+                        const allSubList = Array.from(new Set([...ruleSubStores, ...rawStoreList]));
+                        const hasSubStores = allSubList.length > 0;
+                        const subStoreKey = `${key}___${bStore}`;
+                        const isSubExpanded = !!expandedSubStores[subStoreKey];
+
                         return (
-                          <div key={bStore} className="p-2.5 flex items-center justify-between gap-2 text-xs hover:bg-slate-50">
-                            <div className="min-w-0">
-                              <span className="font-bold text-slate-800">{bStore}</span>
-                              <span className="text-[10px] text-slate-400 ml-2">({data.count}건)</span>
+                          <div key={bStore} className="flex flex-col">
+                            <div 
+                              onClick={() => {
+                                if (hasSubStores) {
+                                  toggleSubStore(subStoreKey);
+                                }
+                              }}
+                              className={`p-2.5 flex items-center justify-between gap-2 text-xs transition ${
+                                hasSubStores ? 'cursor-pointer hover:bg-violet-50/50' : 'hover:bg-slate-50'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                                <span className="font-bold text-slate-800">{bStore}</span>
+                                <span className="text-[10px] text-slate-400">({data.count}건)</span>
+                                {hasSubStores && (
+                                  <span className="text-[10px] bg-violet-100 text-violet-700 font-bold px-1.5 py-0.5 rounded border border-violet-200 flex items-center gap-0.5">
+                                    <Layers className="w-2.5 h-2.5 text-violet-500" />
+                                    종속 {allSubList.length}곳 {isSubExpanded ? '▲' : '▼'}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-3 shrink-0">
+                                <span className="text-rose-600 font-semibold text-[11px]">대납 {formatMoney(data.expense)}</span>
+                                <span className="text-blue-600 font-semibold text-[11px]">입금 {formatMoney(data.income)}</span>
+                                <span className={`font-bold text-xs ${storeDue > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
+                                  미수 {formatMoney(storeDue)}
+                                </span>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-3 shrink-0">
-                              <span className="text-rose-600 font-semibold text-[11px]">대납 {formatMoney(data.expense)}</span>
-                              <span className="text-blue-600 font-semibold text-[11px]">입금 {formatMoney(data.income)}</span>
-                              <span className={`font-bold text-xs ${storeDue > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
-                                미수 {formatMoney(storeDue)}
-                              </span>
-                            </div>
+
+                            {/* Subordinate Store Dropdown Detail */}
+                            {isSubExpanded && hasSubStores && (
+                              <div className="bg-violet-50/60 border-t border-violet-100 divide-y divide-violet-100/70 pl-5 pr-3 py-1.5 space-y-1">
+                                <div className="text-[10px] font-bold text-violet-700 flex items-center gap-1 pt-0.5">
+                                  <Layers className="w-3 h-3 text-violet-500" />
+                                  연결된 종속 거래처 ({allSubList.length}곳 세부 현황)
+                                </div>
+                                {allSubList.map(subName => {
+                                  const subTxs = filtered.filter(t => t._billingStore === bStore && (t._store === subName || t.store === subName));
+                                  const subExpense = subTxs.reduce((sum, t) => sum + t._expense, 0);
+                                  const subIncome = subTxs.reduce((sum, t) => sum + t._income, 0);
+                                  const subDue = Math.max(0, subExpense - subIncome);
+                                  const isSelectedSub = selectedSubSortStore === subName;
+
+                                  return (
+                                    <div
+                                      key={subName}
+                                      onClick={() => setSelectedSubSortStore(prev => prev === subName ? null : subName)}
+                                      className={`py-1 px-1.5 rounded-lg flex items-center justify-between text-[11px] cursor-pointer transition ${
+                                        isSelectedSub ? 'bg-violet-200/80 font-bold' : 'hover:bg-violet-100/60'
+                                      }`}
+                                      title="클릭 시 이 종속 거래처 및 대표그룹 최상단 정렬"
+                                    >
+                                      <div className="flex items-center gap-1.5">
+                                        <CornerDownRight className="w-3 h-3 text-violet-400" />
+                                        <span className={`font-semibold ${isSelectedSub ? 'text-violet-950' : 'text-slate-700'}`}>{subName}</span>
+                                        <span className="text-[10px] text-slate-400">({subTxs.length}건)</span>
+                                      </div>
+                                      <div className="flex items-center gap-2 text-[10px]">
+                                        <span className="text-rose-500 font-medium">대납 {formatMoney(subExpense)}</span>
+                                        <span className="text-blue-500 font-medium">입금 {formatMoney(subIncome)}</span>
+                                        <span className={`font-bold ${subDue > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
+                                          미수 {formatMoney(subDue)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
                         );
                       })}

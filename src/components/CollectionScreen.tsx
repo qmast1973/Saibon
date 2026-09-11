@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Transaction, CollectionRecord, User, CollectionGroupRule } from '../types';
 import { CollectionList } from './CollectionList';
+import { SearchWithGroupDropdown } from './SearchWithGroupDropdown';
 import { formatMoney, normalizeMarketName, getBusinessDate } from '../lib/firebase';
-import { getCollectionBillingStore, matchesTransactionWithGroup, getKoreanInitials, normalizeStoreName } from '../lib/groupRules';
-import { HandCoins, Plus, Search, Layers, X, Download, Upload, Trash2, Edit3, ArrowLeft } from 'lucide-react';
+import { getCollectionBillingStore, matchesTransactionWithGroup, getKoreanInitials, normalizeStoreName, getSubStoresForRepresentative } from '../lib/groupRules';
+import { HandCoins, Plus, Search, Layers, X, Download, Upload, Trash2, Edit3, ArrowLeft, Store } from 'lucide-react';
 
 interface CollectionScreenProps {
   transactions: Transaction[];
@@ -439,16 +440,16 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
                 />
               </div>
 
-              <div className="relative flex-1 min-w-[180px]">
-                <input
-                  type="text"
-                  value={storeFilter}
-                  onChange={(e) => setStoreFilter(e.target.value)}
-                  placeholder="상호/대표거래처 검색 (초성 가능: ㄱㄹㄷ)"
-                  className="border border-gray-700 rounded-xl pl-8 pr-3 py-2 text-xs w-full bg-gray-900 outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-                <Search className="w-3.5 h-3.5 text-gray-500 absolute left-2.5 top-2.5" />
-              </div>
+              <SearchWithGroupDropdown
+                value={storeFilter}
+                onChange={setStoreFilter}
+                placeholder="상호/대표거래처 검색 (초성 가능: ㄱㄹㄷ)"
+                collectionGroupRules={collectionGroupRules || []}
+                knownStores={uniqueStores}
+                theme="dark"
+                className="relative flex-1 min-w-[180px]"
+                inputClassName="border border-gray-700 rounded-xl pl-8 pr-7 py-2 text-xs w-full bg-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 text-gray-200 placeholder-gray-500"
+              />
 
               <select
                 value={buyerFilter}
@@ -496,6 +497,7 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
           <CollectionList 
             groups={groups} 
             allTransactions={filteredRows}
+            collectionGroupRules={collectionGroupRules || []}
             mode="collection" 
             theme="dark" 
             onToggleComplete={handleToggleComplete}
@@ -581,11 +583,14 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
                           const grp = groupMap.get(storeName);
                           const fee = grp ? grp.completedCount * 4 : 0;
                           const balance = grp ? Math.max(0, grp.billed + fee - grp.paid) : 0;
+                          const subStores = getSubStoresForRepresentative(storeName, collectionGroupRules || []);
+                          const repStore = getCollectionBillingStore(storeName, collectionGroupRules || []);
+                          const isSub = repStore && repStore !== storeName;
                           
                           return (
                             <div
                               key={idx}
-                              className="px-3 py-2 hover:bg-indigo-50 cursor-pointer flex justify-between items-center transition"
+                              className="px-3 py-2 hover:bg-gray-800 cursor-pointer flex justify-between items-center transition border-b border-gray-800/50 last:border-0"
                               onMouseDown={(e) => {
                                 e.preventDefault();
                                 setEntryStore(storeName);
@@ -598,9 +603,22 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
                                 }
                               }}
                             >
-                              <span className="font-bold text-gray-100">{storeName}</span>
+                              <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                                <span className="font-bold text-gray-100">{storeName}</span>
+                                {subStores.length > 0 && (
+                                  <span className="text-[10px] bg-violet-900/80 text-violet-200 border border-violet-700/80 px-1 rounded font-bold flex items-center gap-0.5">
+                                    <Layers className="w-2.5 h-2.5 text-violet-400" />
+                                    대표 ({subStores.length}곳)
+                                  </span>
+                                )}
+                                {isSub && (
+                                  <span className="text-[10px] bg-cyan-950 text-cyan-200 border border-cyan-700/80 px-1 rounded font-medium">
+                                    종속 ➔ {repStore}
+                                  </span>
+                                )}
+                              </div>
                               {balance > 0 && (
-                                <span className="text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-bold">
+                                <span className="text-[10px] bg-rose-950 text-rose-300 border border-rose-800 px-1.5 py-0.5 rounded font-bold font-mono">
                                   미수 {formatMoney(balance)}
                                 </span>
                               )}

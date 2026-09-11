@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Transaction } from '../types';
-import { Layers, X, Edit3, Trash2, Plus } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Transaction, CollectionGroupRule } from '../types';
+import { Layers, X, Edit3, Trash2, Plus, ChevronDown, ChevronUp, Store, ArrowDownAZ } from 'lucide-react';
 import { normalizeMarketName, formatMoney } from '../lib/firebase';
+import { getSubStoresForRepresentative, sortStoreGroupsBySubStoreClick, sortTransactionsBySubStoreClick } from '../lib/groupRules';
 
 export interface StoreGroup {
   store: string;
@@ -26,6 +27,7 @@ export interface StoreGroup {
 interface CollectionListProps {
   groups: StoreGroup[];
   allTransactions?: Transaction[]; // alternative to orders in group, used to filter on the fly
+  collectionGroupRules?: CollectionGroupRule[];
   mode: 'collection' | 'stats';
   theme: 'light' | 'dark';
   
@@ -39,6 +41,7 @@ interface CollectionListProps {
 export const CollectionList: React.FC<CollectionListProps> = ({
   groups,
   allTransactions,
+  collectionGroupRules = [],
   mode,
   theme,
   onOpenOrderDetail,
@@ -51,6 +54,19 @@ export const CollectionList: React.FC<CollectionListProps> = ({
   const [orderListStore, setOrderListStore] = useState("");
   const [orderListManager, setOrderListManager] = useState("");
   const [orderListDue, setOrderListDue] = useState(0);
+  const [selectedSubFilter, setSelectedSubFilter] = useState<string | null>(null);
+  const [selectedSubSortStore, setSelectedSubSortStore] = useState<string | null>(null);
+  const [expandedSubStoreRows, setExpandedSubStoreRows] = useState<Record<string, boolean>>({});
+
+  const toggleSubRow = (storeName: string) => {
+    setExpandedSubStoreRows(prev => ({ ...prev, [storeName]: !prev[storeName] }));
+  };
+
+  // Sort groups based on clicked subordinate store
+  const sortedGroups = useMemo(() => {
+    if (!selectedSubSortStore) return groups;
+    return sortStoreGroupsBySubStoreClick(groups, selectedSubSortStore, collectionGroupRules);
+  }, [groups, selectedSubSortStore, collectionGroupRules]);
 
   // Theme configuration
   const bgMain = theme === 'dark' ? 'bg-gray-900' : 'bg-white';
@@ -68,6 +84,29 @@ export const CollectionList: React.FC<CollectionListProps> = ({
   
   return (
     <>
+      {selectedSubSortStore && (
+        <div className={`mb-3 p-2.5 rounded-xl border flex items-center justify-between text-xs animate-fadeIn shadow-sm ${
+          theme === 'dark' ? 'bg-violet-950/40 border-violet-800 text-violet-200' : 'bg-violet-50 border-violet-200 text-violet-900'
+        }`}>
+          <div className="flex items-center gap-2 font-bold min-w-0">
+            <ArrowDownAZ className="w-4 h-4 text-violet-500 shrink-0" />
+            <span className="truncate">
+              종속거래처 <span className="underline decoration-violet-400">'{selectedSubSortStore}'</span> 기준 정렬 활성화 (1순위: 동일 대표거래처 최상단, 2순위: 상호 오름차순)
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSelectedSubSortStore(null)}
+            className={`px-2 py-1 rounded-md text-xs font-bold transition flex items-center gap-1 shrink-0 ${
+              theme === 'dark' ? 'hover:bg-violet-900 text-violet-300' : 'hover:bg-violet-200 text-violet-800'
+            }`}
+          >
+            <X className="w-3.5 h-3.5" />
+            정렬 초기화
+          </button>
+        </div>
+      )}
+
       <div className={`${bgMain} border ${borderMain} rounded-xl shadow-lg overflow-hidden pb-4 mb-24`}>
         <div className="overflow-x-auto">
           <table className={`w-full text-left text-sm ${textSub}`}>
@@ -92,57 +131,160 @@ export const CollectionList: React.FC<CollectionListProps> = ({
               </tr>
             </thead>
             <tbody className={`divide-y ${borderDiv}`}>
-              {groups.length === 0 ? (
+              {sortedGroups.length === 0 ? (
                 <tr>
                   <td colSpan={mode === 'stats' ? 5 : 6} className={`p-10 text-center ${textMuted}`}>
                     해당 조건의 내역이 없습니다.
                   </td>
                 </tr>
               ) : (
-                groups.map((g, i) => {
+                sortedGroups.map((g, i) => {
                   const fee = mode === 'collection' ? g.completedCount * 4 : 0;
                   const balance = mode === 'collection' ? Math.max(0, (g.billed || 0) + fee - (g.paid || 0)) : 0;
+                  const subStores = getSubStoresForRepresentative(g.store, collectionGroupRules);
+                  const isExpanded = !!expandedSubStoreRows[g.store];
                   
+                  // Compute orders belonging to this store group
+                  let groupAllOrders: Transaction[] = [];
+                  if (mode === 'stats' && g.orders) {
+                    groupAllOrders = g.orders;
+                  } else if (allTransactions) {
+                    groupAllOrders = allTransactions.filter(t => (t as any)._billingStore === g.store || t.store === g.store);
+                  }
+
                   return (
-                    <tr 
-                      key={i} 
-                      className={`${rowHover} transition cursor-pointer`}
-                      onClick={() => {
-                        setOrderListStore(g.store);
-                        setOrderListManager(g.manager);
-                        setOrderListDue(balance);
-                        setShowOrderListModal(true);
-                      }}
-                    >
-                      <td className={`p-3 font-semibold ${textSub}`}>{g.region}</td>
-                      <td className={`p-3 ${textMain} font-bold`}>{g.store}</td>
-                      <td className="p-3 text-center">
-                        <div className={`font-bold ${textMain}`}>{g.orderCount}건</div>
-                        <div className="text-[10px] flex items-center justify-center gap-1 mt-0.5 whitespace-nowrap">
-                          <span className={theme === 'dark' ? 'text-emerald-400 font-semibold' : 'text-emerald-600 font-semibold'}>완료 {g.completedCount}</span>
-                          <span className={theme === 'dark' ? 'text-gray-600' : 'text-slate-300'}>/</span>
-                          <span className={theme === 'dark' ? 'text-amber-500 font-semibold' : 'text-amber-600 font-semibold'}>미처리 {g.unprocessedCount}</span>
-                        </div>
-                      </td>
-                      {mode === 'stats' && (
-                        <>
-                          <td className="p-3 text-right text-rose-400 font-mono">{formatMoney(g.totalExpense || 0)}</td>
-                          <td className={theme === 'dark' ? "p-3 text-right text-emerald-400 font-bold" : "p-3 text-right text-emerald-600 font-bold"}>{(g.totalItemCount || 0)}개</td>
-                        </>
-                      )}
-                      {mode === 'collection' && (
-                        <>
-                          <td className="p-3 text-right">
-                            <div className="text-rose-600 font-mono">{formatMoney(g.billed || 0)}</div>
-                            {fee > 0 && <div className="text-[10px] text-indigo-500 font-sans">+사입비 {formatMoney(fee)}</div>}
-                          </td>
-                          <td className="p-3 text-right text-emerald-600 font-mono">{formatMoney(g.paid || 0)}</td>
-                          <td className={`p-3 text-right font-bold font-mono text-sm ${balance > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
-                            {formatMoney(balance)}
-                          </td>
-                        </>
-                      )}
-                    </tr>
+                    <React.Fragment key={i}>
+                      <tr 
+                        className={`${rowHover} transition cursor-pointer`}
+                        onClick={() => {
+                          setOrderListStore(g.store);
+                          setOrderListManager(g.manager);
+                          setOrderListDue(balance);
+                          setSelectedSubFilter(null);
+                          setShowOrderListModal(true);
+                        }}
+                      >
+                        <td className={`p-3 font-semibold ${textSub}`}>{g.region}</td>
+                        <td className={`p-3 ${textMain} font-bold`}>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span>{g.store}</span>
+                            {subStores.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleSubRow(g.store);
+                                }}
+                                className="inline-flex items-center gap-1 text-[11px] bg-violet-950/80 hover:bg-violet-900 text-violet-200 border border-violet-700/80 px-2 py-0.5 rounded-md font-bold transition shadow-2xs"
+                                title="종속 거래처 목록 펼치기/접기"
+                              >
+                                <Layers className="w-3 h-3 text-violet-400" />
+                                <span>종속 {subStores.length}곳</span>
+                                {isExpanded ? <ChevronUp className="w-3 h-3 ml-0.5" /> : <ChevronDown className="w-3 h-3 ml-0.5" />}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-3 text-center">
+                          <div className={`font-bold ${textMain}`}>{g.orderCount}건</div>
+                          <div className="text-[10px] flex items-center justify-center gap-1 mt-0.5 whitespace-nowrap">
+                            <span className={theme === 'dark' ? 'text-emerald-400 font-semibold' : 'text-emerald-600 font-semibold'}>완료 {g.completedCount}</span>
+                            <span className={theme === 'dark' ? 'text-gray-600' : 'text-slate-300'}>/</span>
+                            <span className={theme === 'dark' ? 'text-amber-500 font-semibold' : 'text-amber-600 font-semibold'}>미처리 {g.unprocessedCount}</span>
+                          </div>
+                        </td>
+                        {mode === 'stats' && (
+                          <>
+                            <td className="p-3 text-right text-rose-400 font-mono">{formatMoney(g.totalExpense || 0)}</td>
+                            <td className={theme === 'dark' ? "p-3 text-right text-emerald-400 font-bold" : "p-3 text-right text-emerald-600 font-bold"}>{(g.totalItemCount || 0)}개</td>
+                          </>
+                        )}
+                        {mode === 'collection' && (
+                          <>
+                            <td className="p-3 text-right">
+                              <div className="text-rose-600 font-mono">{formatMoney(g.billed || 0)}</div>
+                              {fee > 0 && <div className="text-[10px] text-indigo-500 font-sans">+사입비 {formatMoney(fee)}</div>}
+                            </td>
+                            <td className="p-3 text-right text-emerald-600 font-mono">{formatMoney(g.paid || 0)}</td>
+                            <td className={`p-3 text-right font-bold font-mono text-sm ${balance > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
+                              {formatMoney(balance)}
+                            </td>
+                          </>
+                        )}
+                      </tr>
+
+                      {/* Subordinate Store Child Rows */}
+                      {isExpanded && subStores.length > 0 && subStores.map(subName => {
+                        const subRows = groupAllOrders.filter(t => (t.store || '').trim().toLowerCase() === subName.toLowerCase());
+                        const subActualOrders = subRows.filter(t => normalizeMarketName(t.market || '') !== '입금' && normalizeMarketName(t.market || '') !== '미수금');
+                        const subCompleted = subActualOrders.filter(t => (t.status || '').trim() !== '').length;
+                        const subUnprocessed = subActualOrders.filter(t => (t.status || '').trim() === '').length;
+                        const subExpense = subRows.filter(t => normalizeMarketName(t.market || '') !== '입금').reduce((acc, t) => acc + (mode === 'collection' ? ((t as any)._expense || 0) : Number(t.expense || 0)), 0);
+                        const subPaid = subRows.filter(t => normalizeMarketName(t.market || '') === '입금').reduce((acc, t) => acc + (mode === 'collection' ? ((t as any)._income || 0) : Number(t.income || 0)), 0);
+                        const subItemCount = subRows.reduce((acc, t) => acc + Number(t.itemCount || 0), 0);
+
+                        return (
+                          <tr
+                            key={`sub-${g.store}-${subName}`}
+                            onClick={() => {
+                              setSelectedSubSortStore(subName);
+                              setOrderListStore(g.store);
+                              setOrderListManager(g.manager);
+                              setOrderListDue(balance);
+                              setSelectedSubFilter(subName);
+                              setShowOrderListModal(true);
+                            }}
+                            className={`transition cursor-pointer text-xs ${
+                              theme === 'dark' ? 'bg-violet-950/20 hover:bg-violet-900/30' : 'bg-violet-50/50 hover:bg-violet-100/50'
+                            }`}
+                          >
+                            <td className="p-2.5 pl-6 text-gray-500 font-mono">
+                              ↳
+                            </td>
+                            <td className="p-2.5">
+                              <div className="flex items-center gap-1.5">
+                                <Store className="w-3 h-3 text-cyan-400" />
+                                <span className={`font-semibold ${theme === 'dark' ? 'text-violet-200' : 'text-violet-900'}`}>
+                                  {subName}
+                                </span>
+                                <span className="text-[10px] text-gray-400 bg-gray-800/80 px-1 rounded">
+                                  종속
+                                </span>
+                              </div>
+                            </td>
+                            <td className="p-2.5 text-center">
+                              <span className="font-bold">{subActualOrders.length}건</span>
+                              <span className="text-[10px] text-gray-400 ml-1.5">
+                                (완료 {subCompleted} / 미처리 {subUnprocessed})
+                              </span>
+                            </td>
+                            {mode === 'stats' && (
+                              <>
+                                <td className="p-2.5 text-right font-mono text-rose-400">
+                                  {formatMoney(subExpense)}
+                                </td>
+                                <td className="p-2.5 text-right font-bold text-emerald-400">
+                                  {subItemCount}개
+                                </td>
+                              </>
+                            )}
+                            {mode === 'collection' && (
+                              <>
+                                <td className="p-2.5 text-right font-mono text-rose-400">
+                                  {formatMoney(subExpense)}
+                                </td>
+                                <td className="p-2.5 text-right font-mono text-emerald-400">
+                                  {formatMoney(subPaid)}
+                                </td>
+                                <td className="p-2.5 text-right text-gray-400 font-mono">
+                                  -
+                                </td>
+                              </>
+                            )}
+                          </tr>
+                        );
+                      })}
+                    </React.Fragment>
                   );
                 })
               )}
@@ -166,6 +308,27 @@ export const CollectionList: React.FC<CollectionListProps> = ({
         const actualOrders = storeOrders.filter(t => normalizeMarketName(t.market || '') !== '입금' && normalizeMarketName(t.market || '') !== '미수금');
         const storeCompleted = actualOrders.filter(t => (t.status || '').trim() !== '').length;
         const storeUnprocessed = actualOrders.filter(t => (t.status || '').trim() === '').length;
+
+        // Subordinate stores for orderListStore
+        const subStoresFromRules = getSubStoresForRepresentative(orderListStore, collectionGroupRules);
+        const presentSubStores = Array.from(new Set(
+          storeOrders
+            .map(t => (t.store || '').trim())
+            .filter(s => s && s.toLowerCase() !== orderListStore.toLowerCase())
+        ));
+        const allSubStores = Array.from(new Set([...subStoresFromRules, ...presentSubStores]));
+
+        // Filtered orders by selected subordinate filter
+        const rawFiltered = selectedSubFilter
+          ? storeOrders.filter(t => (t.store || '').trim().toLowerCase() === selectedSubFilter.toLowerCase())
+          : storeOrders;
+
+        // Sort orders: 1순위 동일 대표거래처 최상단, 2순위 개별 상호명 가나다순 오름차순
+        const displayedOrders = sortTransactionsBySubStoreClick(
+          rawFiltered,
+          selectedSubFilter || selectedSubSortStore || orderListStore,
+          collectionGroupRules
+        );
 
         // Modal Theme values
         const mTextMain = theme === 'dark' ? 'text-white' : 'text-slate-900';
@@ -224,11 +387,65 @@ export const CollectionList: React.FC<CollectionListProps> = ({
                 </div>
               </div>
 
+              {/* Subordinate Store Filter Chips */}
+              {allSubStores.length > 0 && (
+                <div className={`mb-3 p-2.5 rounded-xl border shrink-0 ${
+                  theme === 'dark' ? 'bg-violet-950/40 border-violet-800/70' : 'bg-violet-50 border-violet-200'
+                }`}>
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <span className={`text-xs font-bold flex items-center gap-1 ${
+                      theme === 'dark' ? 'text-violet-300' : 'text-violet-900'
+                    }`}>
+                      <Layers className="w-3.5 h-3.5 text-violet-400" />
+                      연결된 종속 거래처 ({allSubStores.length}곳)
+                    </span>
+                    <span className="text-[10px] text-gray-400">클릭하여 해당 거래처 내역만 필터링</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSubFilter(null)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition ${
+                        selectedSubFilter === null 
+                          ? 'bg-violet-600 text-white shadow' 
+                          : theme === 'dark' ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      전체 보기 ({storeOrders.length}건)
+                    </button>
+                    {allSubStores.map(subName => {
+                      const count = storeOrders.filter(t => (t.store || '').trim().toLowerCase() === subName.toLowerCase()).length;
+                      const isSelected = selectedSubFilter === subName;
+                      return (
+                        <button
+                          key={subName}
+                          type="button"
+                          onClick={() => setSelectedSubFilter(isSelected ? null : subName)}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                            isSelected 
+                              ? 'bg-violet-600 text-white shadow' 
+                              : theme === 'dark'
+                              ? 'bg-violet-950/80 text-violet-200 border border-violet-700/70 hover:bg-violet-900/60'
+                              : 'bg-violet-100 text-violet-800 border border-violet-200 hover:bg-violet-200'
+                          }`}
+                        >
+                          <Store className="w-3 h-3 text-cyan-400" />
+                          <span>{subName}</span>
+                          <span className="text-[10px] opacity-80">({count}건)</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="overflow-y-auto flex-1 -mx-2 px-2 space-y-2">
-                {storeOrders.length === 0 ? (
-                  <div className={`text-center py-8 ${textMuted} text-sm`}>내역이 없습니다.</div>
+                {displayedOrders.length === 0 ? (
+                  <div className={`text-center py-8 ${textMuted} text-sm`}>
+                    {selectedSubFilter ? `'${selectedSubFilter}'에 대한 내역이 없습니다.` : '내역이 없습니다.'}
+                  </div>
                 ) : (
-                  storeOrders.map(t => {
+                  displayedOrders.map(t => {
                     const isDeposit = normalizeMarketName(t.market || '') === '입금';
                     const isCompleted = (t.status || '').trim() !== '';
                     const expense = mode === 'collection' ? (t as any)._expense : Number(t.expense);
