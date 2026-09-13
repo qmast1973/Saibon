@@ -137,12 +137,15 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ currentUser, onClose }
   return (
     <div className="fixed inset-0 w-screen h-screen bg-gray-900 z-[180] overflow-y-auto pt-16">
       {/* Top Navigation Bar */}
-      <div className="fixed top-0 left-0 w-full h-14 bg-gray-900 border-b border-gray-800 z-50 flex items-center px-4 shadow-sm">
-        <button onClick={onClose} className="p-2 -ml-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-xl transition flex items-center gap-1 font-semibold">
-          <ArrowLeft className="w-5 h-5" />
-          <span>뒤로</span>
+      <div className="fixed top-0 left-0 w-full h-14 bg-gray-900 border-b border-gray-800 z-[200] flex items-center justify-between px-4 shadow-sm">
+        <div className="flex items-center gap-2">
+          <MessageSquare className="w-5 h-5 text-indigo-400" />
+          <span className="font-bold text-lg text-gray-100">소통 게시판</span>
+        </div>
+        <button onClick={onClose} className="px-2.5 sm:px-3 py-1.5 sm:py-2 bg-slate-700 hover:bg-slate-600 text-white text-[11px] sm:text-xs font-bold rounded-xl transition flex items-center gap-1 shrink-0" title="닫기 (메인 화면으로)">
+          <X className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-300" />
+          <span>닫기</span>
         </button>
-        <div className="flex-1 font-bold text-center text-lg text-gray-100 pr-10">소통 게시판</div>
       </div>
 
     <div className="max-w-4xl mx-auto p-4 sm:p-6 pb-32 mt-2">

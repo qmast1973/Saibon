@@ -431,6 +431,20 @@ export function parseSmartOrderText(
       detectedStore = '상호 미지정';
     }
 
+
+    // "디" 매직 변환 로직 (AI 파싱 중 호수에 따라 디오트/디자이너 구분)
+    if ((detectedMarket === '디오트' || detectedMarket === '디자이너클럽' || detectedMarket === '디자이너') && detectedRoom) {
+      const noFullNames = !/디오트|디자이너/i.test(rawLine);
+      const hasD = /디|d/i.test(rawLine.replace(/\s+/g, ''));
+      if (noFullNames && hasD) {
+        if (/[a-zA-Z가-힣]/.test(detectedRoom.replace(/호/g, ''))) {
+          detectedMarket = '디오트';
+        } else if (/^[0-9\-\.]+$/.test(detectedRoom.replace(/호/g, ''))) {
+          detectedMarket = '디자이너';
+        }
+      }
+    }
+
     // 결과 판정
     const hasMarket = !!detectedMarket;
     const hasFloorOrRoom = !!detectedFloor || !!detectedRoom;

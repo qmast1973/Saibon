@@ -349,7 +349,7 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
       <div className="max-w-6xl mx-auto space-y-4">
         
         {/* Top Header Card */}
-        <div className="bg-indigo-900 text-white rounded-2xl shadow-lg px-4 py-4 sm:px-6 flex items-center justify-between gap-3 flex-wrap">
+        <div className="bg-indigo-900 text-white rounded-2xl shadow-lg px-4 py-4 sm:px-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div>
             <h2 className="font-bold text-lg flex items-center gap-2">
               <HandCoins className="w-5 h-5 text-indigo-300" />
@@ -360,17 +360,18 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
             </p>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap max-w-full overflow-hidden">
+          <div className="flex items-center sm:justify-end gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto">
             {isAdmin && (
               <>
                 {onOpenGroupManager && (
                   <button
                     type="button"
                     onClick={onOpenGroupManager}
-                    className="px-3 py-2 rounded-xl bg-violet-700 hover:bg-violet-600 text-white text-xs font-bold transition flex items-center gap-1"
+                    className="px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-violet-700 hover:bg-violet-600 text-white text-[11px] sm:text-xs font-bold transition flex items-center gap-1 shrink-0"
                   >
                     <Layers className="w-3.5 h-3.5" />
-                    대표 거래처 관리
+                    <span className="hidden sm:inline">대표 거래처 관리</span>
+                    <span className="sm:hidden">거래처 관리</span>
                   </button>
                 )}
                 
@@ -378,7 +379,7 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
                   <button
                     type="button"
                     onClick={onResetCollectionData}
-                    className="px-3 py-2 rounded-xl bg-rose-700 hover:bg-rose-600 text-white text-xs font-bold transition flex items-center gap-1"
+                    className="px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-rose-700 hover:bg-rose-600 text-white text-[11px] sm:text-xs font-bold transition flex items-center gap-1 shrink-0"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     수금 초기화
@@ -388,9 +389,9 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
                   <button
                     type="button"
                     onClick={onResetAllData}
-                    className="px-3 py-2 rounded-xl bg-red-900 hover:bg-red-800 text-white text-xs font-bold transition"
+                    className="px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-red-900 hover:bg-red-800 text-white text-[11px] sm:text-xs font-bold transition shrink-0"
                   >
-                    전체 주문 초기화
+                    전체 초기화
                   </button>
                 )}
               </>
@@ -398,14 +399,14 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold transition flex items-center gap-1"
+              className="ml-auto sm:ml-0 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-[11px] sm:text-xs font-bold transition flex items-center gap-1 shrink-0"
+              title="닫기 (메인 화면으로)"
             >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              닫기
+              <X className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-300" />
+              <span>닫기</span>
             </button>
           </div>
         </div>
-
         {/* 4 Metric Cards: 총 대납금, 총 주문건수, 완료건수, 미처리 건수 */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <div className="bg-gray-900 rounded-xl border border-gray-800 p-2 shadow-sm">

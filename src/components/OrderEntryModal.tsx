@@ -121,7 +121,7 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
           date,
           businessDate: date,
           store: store.trim(),
-          market: normalizeMarketName(r.market),
+          market: normalizeMarketName(r.market, r.room),
           floor: r.floor.trim(),
           room: r.room.trim(),
           manager: editingTransaction?.manager || "",
@@ -144,7 +144,7 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
             date,
             businessDate: date,
             store: store.trim(),
-            market: normalizeMarketName(r.market),
+            market: normalizeMarketName(r.market, r.room),
             floor: r.floor.trim(),
             room: r.room.trim(),
             manager: "",
@@ -310,7 +310,7 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
                     value={row.market}
                     disabled={isRegularBuyer && isEditMode}
                     onChange={(e) => handleRowChange(index, 'market', e.target.value)}
-                    onBlur={(e) => handleRowChange(index, 'market', normalizeMarketName(e.target.value))}
+                    onBlur={(e) => handleRowChange(index, 'market', normalizeMarketName(e.target.value, row.room))}
                     placeholder="예: 디오트, APM, 청평"
                     className={`w-full border border-gray-700 rounded-xl p-2.5 text-xs bg-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none ${(isRegularBuyer && isEditMode) ? 'bg-gray-950 cursor-not-allowed' : 'focus:bg-gray-900'}`}
                   />
@@ -327,6 +327,7 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
                     value={row.room}
                     disabled={isRegularBuyer && isEditMode}
                     onChange={(e) => handleRowChange(index, 'room', e.target.value)}
+                    onBlur={(e) => { const newMarket = normalizeMarketName(row.market, e.target.value); if(newMarket !== row.market) handleRowChange(index, 'market', newMarket); }}
                     placeholder="예: 25호"
                     className={`w-full border border-gray-700 rounded-xl p-2.5 text-xs bg-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none ${(isRegularBuyer && isEditMode) ? 'bg-gray-950 cursor-not-allowed' : 'focus:bg-gray-900'}`}
                   />

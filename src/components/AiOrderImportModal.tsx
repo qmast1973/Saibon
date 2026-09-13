@@ -73,7 +73,7 @@ export const AiOrderImportModal: React.FC<AiOrderImportModalProps> = ({
 
     try {
       const newTransactions: Transaction[] = parsedRows.map((order, index) => {
-        const market = normalizeMarketName(order.market || '');
+        const market = normalizeMarketName(order.market || '', order.room || '');
         const retailStore = (order.groupStore || defaultStore || '상호 미지정').trim();
         const wholesaleStore = (order.store || '').trim();
         const floor = (order.floor || '').trim();

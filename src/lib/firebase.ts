@@ -63,29 +63,116 @@ function getChosung(str: string) {
   return result;
 }
 
-export function normalizeMarketName(value: string | undefined): string {
+const MARKET_ALIASES: Record<string, string> = {
+  'a': 'APM',
+  'apm': 'APM',
+  '럭스': 'APM럭스',
+  'apm럭스': 'APM럭스',
+  '플레이스': 'APM플레이스',
+  'apm플레이스': 'APM플레이스',
+  'd': '디자이너',
+  '디자이너': '디자이너',
+  '뉴존': '누죤',
+  '누죤': '누죤',
+  '누': '누죤',
+  'n': '누죤',
+  'ddp': '유어스',
+  '유': '유어스',
+  '유어스': '유어스',
+  '팀': '팀204',
+  '204': '팀204',
+  '팀204': '팀204',
+  '제평': '제일평화',
+  '제': '제일평화',
+  'j': '제일평화',
+  'jp': '제일평화',
+  '제일평화': '제일평화',
+  '맥스': '맥스타일',
+  '맥': '맥스타일',
+  '맥스타일': '맥스타일',
+  '신평': '신평화',
+  '신': '신평화',
+  '신평화': '신평화',
+  '남평': '남평화',
+  '남': '남평화',
+  'nph': '남평화',
+  '남평화': '남평화',
+  '퀸즈': '퀸즈스퀘어',
+  '퀸': '퀸즈스퀘어',
+  '퀸즈스퀘어': '퀸즈스퀘어',
+  '광': '광희',
+  '광희': '광희',
+  '벨포': '벨포스트',
+  '벨포스트': '벨포스트',
+  '아트': '아트프라자',
+  '아트프라자': '아트프라자',
+  '더블유': '스튜디오 더블유',
+  'w': '스튜디오 더블유',
+  '스튜디오': '스튜디오 더블유',
+  '스튜디오더블유': '스튜디오 더블유',
+  '혜': '혜양',
+  '혜양': '혜양',
+  '테': '테크노',
+  '테크노': '테크노',
+  '동원': '동원프라자',
+  'dwp': '동원프라자',
+  '동원프라자': '동원프라자',
+  '동평': '동평화',
+  'dph': '동평화',
+  '동평화': '동평화',
+  '청평': '청평화',
+  '청': '청평화',
+  'cph': '청평화',
+  '청평화': '청평화',
+  '디오': '디오트',
+  '디': '디오트',
+  '디오트': '디오트',
+  '픽대지': '픽대지',
+  '신발': '신발상가',
+  '신발상가': '신발상가'
+};
+
+export function normalizeMarketName(value: string | undefined, room: string = ''): string {
   const input = String(value ?? '').trim();
   if (!input) return '';
+  
   const raw = input.replace(/\s+/g, '').toLowerCase();
   
-  // 1. Exact match (ignoring spaces/case)
+  // "디" / "d" 매직 변환 로직 (호수에 따라 디오트/디자이너 구분)
+  if (raw === '디' || raw === 'd' || raw === '디오트' || raw === '디자이너') {
+    const cleanRoom = room.replace(/호/g, '').trim();
+    if (cleanRoom) {
+      if (/[a-zA-Z가-힣]/.test(cleanRoom)) {
+        return '디오트';
+      } else if (/^[0-9\-\.]+$/.test(cleanRoom)) {
+        return '디자이너';
+      }
+    }
+  }
+  
+  // 1. Explicit Alias Mapping check
+  if (MARKET_ALIASES[raw]) {
+    return MARKET_ALIASES[raw];
+  }
+  
+  // 2. Exact match (ignoring spaces/case)
   for (const m of _MARKETS_FOR_RESOLVE) {
     if (m.replace(/\s+/g, '').toLowerCase() === raw) return m;
   }
   
-  // 2. Chosung match
+  // 3. Chosung match
   for (const m of _MARKETS_FOR_RESOLVE) {
     const chosung = getChosung(m).replace(/\s+/g, '').toLowerCase();
     if (chosung === raw) return m;
   }
   
-  // 3. Partial Chosung or Partial match (prefix)
+  // 4. Partial Chosung or Partial match (prefix)
   for (const m of _MARKETS_FOR_RESOLVE) {
     const chosung = getChosung(m).replace(/\s+/g, '').toLowerCase();
     const cleanM = m.replace(/\s+/g, '').toLowerCase();
     if (chosung.startsWith(raw) || cleanM.startsWith(raw)) return m;
   }
-
+  
   return input.replace(/\s+/g, ' ').replace(/[A-Za-z]+/g, m => m.toUpperCase());
 }
 

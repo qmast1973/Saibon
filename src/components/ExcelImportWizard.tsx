@@ -167,7 +167,7 @@ export const ExcelImportWizard: React.FC<ExcelImportWizardProps> = ({
         importedManagerRole: role,
         region: String(r.region || '합성동').trim(),
         store: String(r.store || '').trim(),
-        market: normalizeMarketName(r.market || ''),
+        market: normalizeMarketName(r.market || '', r.room || ''),
         floor: String(r.floor || '').trim(),
         room: String(r.room || '').trim(),
         expense,
