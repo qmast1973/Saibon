@@ -3,6 +3,7 @@ import { Transaction, User, CollectionGroupRule } from '../types';
 import { formatMoney, normalizeDateStr } from '../lib/firebase';
 import { getCollectionBillingStore, sortTransactionsBySubStoreClick } from '../lib/groupRules';
 import { ChevronLeft, ChevronRight, CalendarCheck, Plus, Edit, Trash2, CheckCircle2, Sparkles, Layers, X } from 'lucide-react';
+import Holidays from 'date-holidays';
 
 interface CalendarViewProps {
   currentDate: Date;
@@ -52,6 +53,76 @@ export const CalendarView: React.FC<CalendarViewProps> = React.memo(({
   const firstDayIndex = new Date(year, month, 1).getDay();
   const lastDate = new Date(year, month + 1, 0).getDate();
   const prevLastDate = new Date(year, month, 0).getDate();
+
+  const krHolidays = useMemo(() => {
+    const hd = new Holidays('KR', { languages: ['ko'] });
+    const h = hd.getHolidays(year);
+    const map: Record<string, string> = {};
+    
+    const rawHolidays: { dateStr: string; name: string; dateObj: Date }[] = [];
+    
+    h.forEach(holiday => {
+      if (holiday.type === 'public') {
+        let current = new Date(holiday.start);
+        const endDate = new Date(holiday.end);
+        
+        while (current < endDate) {
+          const kstDate = new Date(current.getTime() + (9 * 60 * 60 * 1000));
+          const y = kstDate.getUTCFullYear();
+          const m = String(kstDate.getUTCMonth() + 1).padStart(2, '0');
+          const d = String(kstDate.getUTCDate()).padStart(2, '0');
+          
+          rawHolidays.push({ 
+            dateStr: `${y}-${m}-${d}`, 
+            name: holiday.name, 
+            dateObj: new Date(y, kstDate.getUTCMonth(), kstDate.getUTCDate()) 
+          });
+          current.setDate(current.getDate() + 1);
+        }
+      }
+    });
+    
+    rawHolidays.sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
+    
+    const groups: typeof rawHolidays[] = [];
+    let currentGroup: typeof rawHolidays = [];
+    
+    rawHolidays.forEach((item) => {
+      if (currentGroup.length === 0) {
+        currentGroup.push(item);
+      } else {
+        const lastItem = currentGroup[currentGroup.length - 1];
+        const diff = (item.dateObj.getTime() - lastItem.dateObj.getTime()) / (1000 * 60 * 60 * 24);
+        
+        if (diff === 1) {
+          currentGroup.push(item);
+        } else if (diff === 0) {
+          // Overwrite with the later one (usually substitute holiday is more specific)
+          currentGroup[currentGroup.length - 1] = item;
+        } else {
+          groups.push(currentGroup);
+          currentGroup = [item];
+        }
+      }
+    });
+    if (currentGroup.length > 0) groups.push(currentGroup);
+    
+    groups.forEach(group => {
+      if (group.length > 1) {
+        const lastDayStr = group[group.length - 1].dateStr;
+        const lastDayNum = parseInt(lastDayStr.split('-')[2], 10);
+        group.forEach((item) => {
+          let baseName = item.name.replace(/ \(대체공휴일\)/g, '');
+          map[item.dateStr] = `${baseName} (~${lastDayNum}일)`;
+        });
+      } else {
+        map[group[0].dateStr] = group[0].name;
+      }
+    });
+    
+    return map;
+  }, [year]);
+
 
   // Aggregate stats per day - Memoized
   const dayMap = useMemo(() => {
@@ -103,11 +174,41 @@ export const CalendarView: React.FC<CalendarViewProps> = React.memo(({
       return sum + (exp < 0 ? Math.abs(exp) : 0) + (inc > 0 ? inc : 0);
     }, 0);
   }, [financialDayTxs]);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchEndX, setTouchEndX] = useState<number | null>(null);
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEndX(null);
+    setTouchStartX(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEndX(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (touchStartX === null || touchEndX === null) return;
+    const distance = touchStartX - touchEndX;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+    
+    if (isLeftSwipe) {
+      onChangeMonth(1);
+    } else if (isRightSwipe) {
+      onChangeMonth(-1);
+    }
+  };
 
   return (
     <section className="flex-1 flex flex-col lg:flex-row gap-4">
       {/* Left: Monthly Calendar Grid */}
-      <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 flex flex-col">
+      <div 
+        className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 flex flex-col"
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
         {/* Month Header & Nav */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
@@ -167,7 +268,7 @@ export const CalendarView: React.FC<CalendarViewProps> = React.memo(({
           {/* Previous month filler */}
           {Array.from({ length: firstDayIndex }).map((_, i) => {
             const d = prevLastDate - (firstDayIndex - 1 - i);
-            return (
+  return (
               <div key={`prev-${i}`} className="relative bg-slate-50/50 rounded-xl min-h-[56px] sm:min-h-[72px] border border-slate-100">
                 <span className="absolute top-1.5 left-1.5 font-medium text-slate-300 text-[13px] sm:text-[15px] leading-none">{d}</span>
               </div>
@@ -178,15 +279,15 @@ export const CalendarView: React.FC<CalendarViewProps> = React.memo(({
           {Array.from({ length: lastDate }).map((_, i) => {
             const d = i + 1;
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            const holidayName = krHolidays[dateStr];
             const dayData = dayMap[dateStr] || { count: 0, expense: 0, income: 0 };
             const isSelected = dateStr === selectedDateStr;
             const dayOfWeek = new Date(year, month, d).getDay();
 
             let dateColor = 'text-slate-800';
-            if (dayOfWeek === 0) dateColor = 'text-rose-600';
-            if (dayOfWeek === 6) dateColor = 'text-blue-600';
-
-            return (
+            if (dayOfWeek === 0 || holidayName) dateColor = 'text-rose-600';
+            else if (dayOfWeek === 6) dateColor = 'text-blue-600';
+  return (
               <div
                 key={dateStr}
                 onClick={() => onSelectDate(dateStr, dayData.count > 0)}
@@ -198,9 +299,14 @@ export const CalendarView: React.FC<CalendarViewProps> = React.memo(({
                     : 'bg-white/60 hover:bg-slate-50 border-slate-200'
                 }`}
               >
-                <span className={`absolute top-1.5 left-1.5 font-black text-[13px] sm:text-[15px] leading-none ${dateColor}`}>
-                  {d}
-                </span>
+                <div className={`absolute top-1 left-1.5 flex flex-col items-start ${dateColor}`}>
+                  <span className="font-black text-[13px] sm:text-[15px] leading-none">{d}</span>
+                  {holidayName && (
+                    <span className="text-[9px] font-bold leading-none tracking-tight mt-0.5 max-w-[40px] sm:max-w-[60px] truncate opacity-80" title={holidayName}>
+                      {holidayName}
+                    </span>
+                  )}
+                </div>
                 
                 {dayData.count > 0 && (
                   <span className="bg-indigo-100 text-indigo-700 text-[10px] sm:text-xs font-bold px-1.5 py-0.5 rounded-md mt-4 shadow-sm">
@@ -315,8 +421,7 @@ export const CalendarView: React.FC<CalendarViewProps> = React.memo(({
               const repStore = collectionGroupRules.length > 0 ? getCollectionBillingStore(t.store, collectionGroupRules) : '';
               const isSubordinate = repStore && repStore !== t.store;
               const isStoreActiveInSort = selectedSubSortStore === t.store || selectedSubSortStore === repStore;
-
-              return (
+  return (
                 <div
                   key={t.id}
                   className={`p-3 rounded-xl border text-xs flex flex-col gap-1.5 transition ${
