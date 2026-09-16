@@ -22,6 +22,9 @@ export interface StoreGroup {
   billed?: number;
   paid?: number;
   
+  isMonthlyPurchase?: boolean;
+  monthlyPurchaseAmount?: number;
+  
   orders?: Transaction[];
 }
 
@@ -140,7 +143,7 @@ export const CollectionList: React.FC<CollectionListProps> = ({
                 </tr>
               ) : (
                 sortedGroups.map((g, i) => {
-                  const fee = mode === 'collection' ? g.completedCount * 4 : 0;
+                  const fee = mode === 'collection' && !g.isMonthlyPurchase ? g.completedCount * 4 : 0;
                   const balance = mode === 'collection' ? Math.max(0, (g.billed || 0) + fee - (g.paid || 0)) : 0;
                   const subStores = getSubStoresForRepresentative(g.store, collectionGroupRules);
                   const isExpanded = !!expandedSubStoreRows[g.store];
@@ -205,6 +208,11 @@ export const CollectionList: React.FC<CollectionListProps> = ({
                             <td className="p-3 text-right">
                               <div className="text-rose-600 font-mono">{formatMoney(g.billed || 0)}</div>
                               {fee > 0 && <div className="text-[10px] text-indigo-500 font-sans">+사입비 {formatMoney(fee)}</div>}
+                              {g.isMonthlyPurchase && (
+                                <div className="text-[10px] text-emerald-500 font-sans mt-0.5 border border-emerald-500/30 bg-emerald-500/10 rounded px-1 inline-block">
+                                  월사입{g.monthlyPurchaseAmount ? `(${formatMoney(g.monthlyPurchaseAmount)})` : ''} 제외
+                                </div>
+                              )}
                             </td>
                             <td className="p-3 text-right text-emerald-600 font-mono">{formatMoney(g.paid || 0)}</td>
                             <td className={`p-3 text-right font-bold font-mono text-sm ${balance > 0 ? 'text-amber-600' : 'text-slate-400'}`}>

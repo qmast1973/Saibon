@@ -199,11 +199,32 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
       orderCount: number;
       completedCount: number;
       unprocessedCount: number;
+      isMonthlyPurchase?: boolean;
+      monthlyPurchaseAmount?: number;
     }>();
 
     filteredRows.forEach(t => {
       const key = t._billingStore;
       if (!map.has(key)) {
+        let isMonthlyPurchase = false;
+        let monthlyPurchaseAmount = 0;
+        
+        if (collectionGroupRules) {
+          const rule = collectionGroupRules.find(r => (r.groupName || '').trim() === key && r.isMonthlyPurchase);
+          if (rule) {
+            isMonthlyPurchase = true;
+            monthlyPurchaseAmount = rule.monthlyPurchaseAmount || 0;
+          }
+        }
+        
+        if (!isMonthlyPurchase) {
+          const merchantUser = users.find(u => u.role === 'merchant' && u.storeName === key && u.isMonthlyPurchase);
+          if (merchantUser) {
+            isMonthlyPurchase = true;
+            monthlyPurchaseAmount = merchantUser.monthlyPurchaseAmount || 0;
+          }
+        }
+
         map.set(key, {
           store: t._billingStore,
           region: t._region,
@@ -212,7 +233,9 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
           paid: 0,
           orderCount: 0,
           completedCount: 0,
-          unprocessedCount: 0
+          unprocessedCount: 0,
+          isMonthlyPurchase,
+          monthlyPurchaseAmount
         });
       }
       const g = map.get(key)!;
@@ -231,7 +254,7 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
     });
 
     return map;
-  }, [filteredRows]);
+  }, [filteredRows, collectionGroupRules, users]);
 
   const groups = [...groupMap.values()].sort((a, b) => {
     const regionA = a.region || '';
@@ -521,7 +544,7 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
         {/* Collection Entry Modal */}
         {showEntryModal && (() => {
           const matchedGroup = groups.find(g => g.store === entryStore);
-          const fee = matchedGroup ? matchedGroup.completedCount * 4 : 0;
+          const fee = matchedGroup && !matchedGroup.isMonthlyPurchase ? matchedGroup.completedCount * 4 : 0;
           
           return (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[190] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
@@ -558,6 +581,11 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
                         (사입비 <span className="font-bold font-mono">{formatMoney(fee)}</span> 포함)
                       </div>
                     )}
+                    {matchedGroup && matchedGroup.isMonthlyPurchase && (
+                      <div className="text-emerald-500 font-medium text-[11px] mt-0.5 flex justify-end items-center gap-1">
+                        (월사입{matchedGroup.monthlyPurchaseAmount ? ` ${formatMoney(matchedGroup.monthlyPurchaseAmount)}` : ''} - 사입비 청구 제외)
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -582,7 +610,7 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
                       <div className="absolute z-10 w-full mt-1 bg-gray-900 border border-gray-800 rounded-xl shadow-lg max-h-48 overflow-y-auto">
                         {filteredStoresForEntry.map((storeName, idx) => {
                           const grp = groupMap.get(storeName);
-                          const fee = grp ? grp.completedCount * 4 : 0;
+                          const fee = grp && !grp.isMonthlyPurchase ? grp.completedCount * 4 : 0;
                           const balance = grp ? Math.max(0, grp.billed + fee - grp.paid) : 0;
                           const subStores = getSubStoresForRepresentative(storeName, collectionGroupRules || []);
                           const repStore = getCollectionBillingStore(storeName, collectionGroupRules || []);

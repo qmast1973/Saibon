@@ -89,6 +89,8 @@ export const GroupRulesManagerModal: React.FC<GroupRulesManagerModalProps> = ({
   const [storeName, setStoreName] = useState('');
   const [groupName, setGroupName] = useState(selectedGroupName);
   const [note, setNote] = useState('');
+  const [isMonthlyPurchase, setIsMonthlyPurchase] = useState(false);
+  const [monthlyPurchaseAmount, setMonthlyPurchaseAmount] = useState<number | ''>('');
   const [applyAllDates, setApplyAllDates] = useState(true);
   const [effectiveFrom, setEffectiveFrom] = useState(currentDateStr || new Date().toISOString().slice(0, 10));
   const [matchType, setMatchType] = useState<'exact' | 'prefix'>('exact');
@@ -161,6 +163,8 @@ export const GroupRulesManagerModal: React.FC<GroupRulesManagerModalProps> = ({
     setGroupName(item.groupName);
     setMatchType(item.matchType || 'exact');
     setNote(item.note || '');
+    setIsMonthlyPurchase(item.isMonthlyPurchase || false);
+    setMonthlyPurchaseAmount(item.monthlyPurchaseAmount || '');
     if (item.effectiveFrom) {
       setApplyAllDates(false);
       setEffectiveFrom(item.effectiveFrom);
@@ -232,6 +236,8 @@ export const GroupRulesManagerModal: React.FC<GroupRulesManagerModalProps> = ({
     setStoreName('');
     setNote('');
     setGroupName(selectedGroupName);
+    setIsMonthlyPurchase(false);
+    setMonthlyPurchaseAmount('');
     setEditingId(null);
     setApplyAllDates(true);
     setFeedbackMsg(null);
@@ -344,7 +350,9 @@ export const GroupRulesManagerModal: React.FC<GroupRulesManagerModalProps> = ({
           matchType,
           systemDefault: Boolean(r.systemDefault),
           createdAt: r.createdAt || new Date().toISOString(),
-          note: cleanNote
+          note: cleanNote,
+          isMonthlyPurchase,
+          monthlyPurchaseAmount: isMonthlyPurchase ? (Number(monthlyPurchaseAmount) || 0) : undefined
         } : r);
       } else {
         const newRule: CollectionGroupRule = {
@@ -355,7 +363,9 @@ export const GroupRulesManagerModal: React.FC<GroupRulesManagerModalProps> = ({
           effectiveFrom: applyAllDates ? '' : (effectiveFrom || ''),
           systemDefault: false,
           createdAt: new Date().toISOString(),
-          note: cleanNote
+          note: cleanNote,
+          isMonthlyPurchase,
+          monthlyPurchaseAmount: isMonthlyPurchase ? (Number(monthlyPurchaseAmount) || 0) : undefined
         };
         updated = [...localRules, newRule];
       }
@@ -384,6 +394,8 @@ export const GroupRulesManagerModal: React.FC<GroupRulesManagerModalProps> = ({
       
       setStoreName('');
       setNote('');
+      setIsMonthlyPurchase(false);
+      setMonthlyPurchaseAmount('');
       setEditingId(null);
       setTimeout(() => setFeedbackMsg(null), 4000);
     } catch (err: any) {
@@ -685,6 +697,39 @@ export const GroupRulesManagerModal: React.FC<GroupRulesManagerModalProps> = ({
             </div>
           </div>
 
+          <div className="bg-gray-900 p-3 rounded-lg border border-gray-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="isMonthlyPurchaseCheck"
+                checked={isMonthlyPurchase}
+                onChange={(e) => {
+                  setIsMonthlyPurchase(e.target.checked);
+                  if (!e.target.checked) setMonthlyPurchaseAmount('');
+                }}
+                className="w-4 h-4 rounded text-violet-600 bg-gray-900 border-gray-700 focus:ring-violet-500 cursor-pointer"
+              />
+              <label htmlFor="isMonthlyPurchaseCheck" className="font-bold text-gray-200 cursor-pointer select-none flex items-center gap-1.5">
+                월사입 (월 고정 사입) 설정
+              </label>
+            </div>
+            {isMonthlyPurchase && (
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <span className="text-gray-400 font-medium">월 사입비:</span>
+                <div className="relative flex-1 sm:w-40">
+                  <input
+                    type="number"
+                    value={monthlyPurchaseAmount}
+                    onChange={(e) => setMonthlyPurchaseAmount(e.target.value ? Number(e.target.value) : '')}
+                    placeholder="예: 100000"
+                    className="w-full border border-violet-700/50 rounded-lg py-1.5 pl-2 pr-6 bg-gray-950 text-emerald-300 outline-none focus:ring-2 focus:ring-violet-500 font-mono text-right"
+                  />
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">원</span>
+                </div>
+              </div>
+            )}
+          </div>
+
           <button
             type="submit"
             disabled={isSubmitting}
@@ -778,6 +823,11 @@ export const GroupRulesManagerModal: React.FC<GroupRulesManagerModalProps> = ({
                             <span className="text-gray-100 font-bold group-hover:text-violet-300 transition">
                               {item.storeName}
                             </span>
+                            {item.isMonthlyPurchase && (
+                              <span className="text-[9px] bg-emerald-950/70 border border-emerald-700/80 text-emerald-300 px-1.5 py-0.5 rounded font-medium">
+                                월사입
+                              </span>
+                            )}
                             {item.matchType === 'prefix' ? (
                               <span className="text-[9px] bg-amber-950/70 border border-amber-700/80 text-amber-300 px-1.5 py-0.5 rounded font-medium">
                                 접두사 일치*

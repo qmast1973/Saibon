@@ -12,6 +12,7 @@ interface AdminUserManagementModalProps {
   onOpenAdminAdd: () => void;
   onOpenGroupRules?: () => void;
   onUserDeleted?: (username: string) => void;
+  onUserUpdated?: (user: User) => void;
 }
 
 export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> = ({
@@ -21,7 +22,8 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
   onOpenProfile,
   onOpenAdminAdd,
   onOpenGroupRules,
-  onUserDeleted
+  onUserDeleted,
+  onUserUpdated
 }) => {
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -32,6 +34,9 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
 
   const [userToDelete, setUserToDelete] = React.useState<User | null>(null);
   const [alertMsg, setAlertMsg] = React.useState<string | null>(null);
+  const [monthlyTarget, setMonthlyTarget] = React.useState<User | null>(null);
+  const [monthlyAmount, setMonthlyAmount] = React.useState<string>('');
+  
   const handleToggleBuyerAdmin = async (user: User) => {
     if (currentUser?.role !== 'admin') {
       alert('최고 관리자만 서브관리자 권한을 부여할 수 있습니다.');
@@ -40,6 +45,7 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
     try {
       const updated: User = { ...user, isBuyerAdmin: !user.isBuyerAdmin };
       await saveUserToFirebase(updated);
+      onUserUpdated?.(updated);
     } catch (err) {
       console.error(err);
       alert('권한 변경에 실패했습니다.');
@@ -53,6 +59,7 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
         approved: !user.approved
       };
       await saveUserToFirebase(updated);
+      onUserUpdated?.(updated);
     } catch (err) {
       console.error('승인 상태 변경 오류:', err);
       setAlertMsg('승인 상태를 변경하지 못했습니다.');
@@ -88,6 +95,7 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
         passwordHash
       };
       await saveUserToFirebase(updated);
+      onUserUpdated?.(updated);
       setAlertMsg(`초기화 완료! 아이디: ${user.username}, 임시 PW: ${tempPassword}`);
     } catch (err) {
       console.error('비밀번호 초기화 실패:', err);
@@ -242,6 +250,11 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
                               {user.storeName}
                             </span>
                           )}
+                          {user.role === 'merchant' && user.isMonthlyPurchase && (
+                            <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md font-bold text-[10px] border border-emerald-300">
+                              [월사입] {(user.monthlyPurchaseAmount || 0).toLocaleString()}원
+                            </span>
+                          )}
                           <span className="text-gray-500 font-mono text-[11px]">({user.username})</span>
                           <span
                             className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
@@ -303,6 +316,39 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
                             {user.isBuyerAdmin ? '서브관리자 해제' : '서브관리자 부여'}
                           </button>
                         )}
+                        
+                        {user.role === 'merchant' && currentUser?.role === 'admin' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (user.isMonthlyPurchase) {
+                                const updatedUser = {
+                                  ...user,
+                                  isMonthlyPurchase: false,
+                                  monthlyPurchaseAmount: 0
+                                };
+                                saveUserToFirebase(updatedUser).then(() => {
+                                  onUserUpdated?.(updatedUser);
+                                  setAlertMsg(`[${user.storeName || user.name}] 월사입 설정이 해제되었습니다.`);
+                                }).catch(err => {
+                                  console.error(err);
+                                  setAlertMsg('월사입 설정 해제에 실패했습니다.');
+                                });
+                              } else {
+                                setMonthlyTarget(user);
+                                setMonthlyAmount(String(user.monthlyPurchaseAmount || ''));
+                              }
+                            }}
+                            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${
+                              user.isMonthlyPurchase
+                                ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-300'
+                                : 'bg-gray-950 hover:bg-slate-200 text-gray-200 border border-gray-700'
+                            }`}
+                          >
+                            <Store className="w-3 h-3" />
+                            {user.isMonthlyPurchase ? '월사입 해제' : '월사입 설정'}
+                          </button>
+                        )}
                         {user.role !== 'admin' && (
                           <button
                             type="button"
@@ -357,6 +403,70 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
           </button>
         </div>
       </div>
+      
+      {/* Monthly Purchase Modal */}
+      {monthlyTarget && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+          <div className="bg-gray-900 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl border border-gray-800 flex flex-col">
+            <div className="p-4 border-b border-gray-800 bg-gray-950 flex items-center justify-between">
+              <h3 className="text-white font-bold flex items-center gap-2">
+                <Store className="w-4 h-4 text-emerald-400" />
+                월사입 설정
+              </h3>
+              <button
+                type="button"
+                onClick={() => setMonthlyTarget(null)}
+                className="w-8 h-8 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-400 flex items-center justify-center transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-4">
+              <p className="text-sm text-gray-300 mb-4">
+                <span className="font-bold text-white">{monthlyTarget.storeName || monthlyTarget.name}</span> 회원의 월 사입비를 입력하세요.
+              </p>
+              <input
+                type="text"
+                value={monthlyAmount}
+                onChange={(e) => setMonthlyAmount(e.target.value.replace(/[^0-9]/g, ''))}
+                placeholder="숫자만 입력 (예: 1000000)"
+                className="w-full px-4 py-3 rounded-xl bg-gray-950 border border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 font-mono text-sm"
+              />
+            </div>
+            <div className="p-4 border-t border-gray-800 bg-gray-950 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setMonthlyTarget(null)}
+                className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-bold transition"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const amt = Number(monthlyAmount) || 0;
+                  const updatedUser = {
+                    ...monthlyTarget,
+                    isMonthlyPurchase: true,
+                    monthlyPurchaseAmount: amt
+                  };
+                  saveUserToFirebase(updatedUser).then(() => {
+                    onUserUpdated?.(updatedUser);
+                    setAlertMsg(`[${updatedUser.storeName || updatedUser.name}] 월사입 설정이 등록되었습니다.`);
+                    setMonthlyTarget(null);
+                  }).catch(err => {
+                    console.error(err);
+                    setAlertMsg('월사입 설정에 실패했습니다.');
+                  });
+                }}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-xs transition"
+              >
+                저장하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

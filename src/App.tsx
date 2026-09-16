@@ -1101,6 +1101,9 @@ export default function App() {
           onUserDeleted={(username) => {
             setUsers(prev => prev.filter(u => u.username !== username));
           }}
+          onUserUpdated={(updatedUser) => {
+            setUsers(prev => prev.map(u => u.username === updatedUser.username ? updatedUser : u));
+          }}
         />
       )}
 
@@ -1240,6 +1243,7 @@ export default function App() {
       {showBuyerWorkdayStatsScreen && (currentUser?.role === 'buyer' || currentUser?.role === 'admin') && (
         <BuyerWorkdayStatsScreen
           currentUser={currentUser}
+          users={users}
           transactions={roleFilteredTransactions}
           collectionGroupRules={collectionGroupRules}
           selectedDateStr={selectedDateStr}

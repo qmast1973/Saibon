@@ -34,6 +34,7 @@ import {
 
 interface BuyerWorkdayStatsScreenProps {
   currentUser: User;
+  users?: User[];
   transactions: Transaction[];
   collectionGroupRules?: CollectionGroupRule[];
   selectedDateStr: string;
@@ -47,6 +48,7 @@ interface BuyerWorkdayStatsScreenProps {
 
 export const BuyerWorkdayStatsScreen: React.FC<BuyerWorkdayStatsScreenProps> = React.memo(({
   currentUser,
+  users = [],
   transactions,
   collectionGroupRules = [],
   selectedDateStr,
@@ -275,6 +277,25 @@ export const BuyerWorkdayStatsScreen: React.FC<BuyerWorkdayStatsScreenProps> = R
         ? getCollectionBillingStore(rawStore, collectionGroupRules)
         : rawStore;
       if (!map.has(key)) {
+        let isMonthlyPurchase = false;
+        let monthlyPurchaseAmount = 0;
+        
+        if (collectionGroupRules) {
+          const rule = collectionGroupRules.find(r => (r.groupName || '').trim() === key && r.isMonthlyPurchase);
+          if (rule) {
+            isMonthlyPurchase = true;
+            monthlyPurchaseAmount = rule.monthlyPurchaseAmount || 0;
+          }
+        }
+        
+        if (!isMonthlyPurchase) {
+          const merchantUser = users.find(u => u.role === 'merchant' && u.storeName === key && u.isMonthlyPurchase);
+          if (merchantUser) {
+            isMonthlyPurchase = true;
+            monthlyPurchaseAmount = merchantUser.monthlyPurchaseAmount || 0;
+          }
+        }
+
         map.set(key, {
           store: key,
           region: t.region || '',
@@ -285,6 +306,8 @@ export const BuyerWorkdayStatsScreen: React.FC<BuyerWorkdayStatsScreenProps> = R
           totalExpense: 0,
           totalIncome: 0,
           totalItemCount: 0,
+          isMonthlyPurchase,
+          monthlyPurchaseAmount,
           orders: []
         });
       }
@@ -306,7 +329,7 @@ export const BuyerWorkdayStatsScreen: React.FC<BuyerWorkdayStatsScreenProps> = R
     });
 
     return Array.from(map.values()).sort((a, b) => a.store.localeCompare(b.store, 'ko'));
-  }, [filteredOrders, collectionGroupRules]);
+  }, [filteredOrders, collectionGroupRules, users]);
 
   // Update Status (완료 / 미송 / 반품)
   const handleUpdateStatus = async (tx: Transaction, newStatus: string) => {

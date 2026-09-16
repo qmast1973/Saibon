@@ -11,6 +11,8 @@ export interface User {
   approved: boolean;
   isBuyerAdmin?: boolean; // NEW: true if buyer has admin privileges
   storeName?: string; // For merchant
+  isMonthlyPurchase?: boolean; // For merchant (월 고정 사입 여부)
+  monthlyPurchaseAmount?: number; // For merchant (월 사입비 금액)
 
   address?: string; // For merchant delivery address
   businessNumber?: string;
@@ -80,6 +82,8 @@ export interface CollectionGroupRule {
   systemDefault?: boolean;
   createdAt?: string;
   note?: string; // 비고 및 특이사항
+  isMonthlyPurchase?: boolean; // 월사입 여부
+  monthlyPurchaseAmount?: number; // 월 사입비 금액
 }
 
 export interface BoardComment {
