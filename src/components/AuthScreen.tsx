@@ -531,7 +531,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                         required
                         value={regStoreName}
                         onChange={(e) => setRegStoreName(e.target.value)}
-                        placeholder="예: 초록밀크, 리썸"
+                        placeholder="예: 상호명A, 상호명B"
                         className="w-full border border-slate-300 rounded-xl p-2.5 text-xs bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
                       />
                     </div>

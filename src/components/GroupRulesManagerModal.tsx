@@ -58,9 +58,6 @@ export const GroupRulesManagerModal: React.FC<GroupRulesManagerModalProps> = ({
       if (g) set.add(g);
     });
 
-    // 기본 거래처
-    set.add('호치키스');
-
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'ko-KR'));
   }, [merchantUsers, localRules]);
 
@@ -70,10 +67,23 @@ export const GroupRulesManagerModal: React.FC<GroupRulesManagerModalProps> = ({
       const myStore = (currentUser.storeName || currentUser.name || currentUser.username || '').trim();
       if (myStore && groupNames.includes(myStore)) return myStore;
     }
-    return groupNames.includes('호치키스') ? '호치키스' : (groupNames[0] || '호치키스');
+    return groupNames[0] || '';
   }, [currentUser, groupNames]);
 
   const [selectedGroupName, setSelectedGroupName] = useState<string>(initialGroupName);
+
+  // groupNames 변경 시 selectedGroupName 동기화
+  useEffect(() => {
+    if (groupNames.length > 0) {
+      if (!selectedGroupName || !groupNames.includes(selectedGroupName)) {
+        setSelectedGroupName(groupNames[0]);
+      }
+    } else {
+      if (selectedGroupName !== '') {
+        setSelectedGroupName('');
+      }
+    }
+  }, [groupNames, selectedGroupName]);
 
   // 3. 입력 폼 상태
   const [storeName, setStoreName] = useState('');
@@ -456,38 +466,47 @@ export const GroupRulesManagerModal: React.FC<GroupRulesManagerModalProps> = ({
                     setSelectedGroupName(val);
                     setGroupName(val);
                   }}
-                  className="border border-gray-700 rounded-lg px-3 py-2 bg-gray-900 text-gray-100 font-bold text-xs outline-none focus:ring-2 focus:ring-violet-500 cursor-pointer"
+                  disabled={groupNames.length === 0}
+                  className="border border-gray-700 rounded-lg px-3 py-2 bg-gray-900 text-gray-100 font-bold text-xs outline-none focus:ring-2 focus:ring-violet-500 cursor-pointer disabled:opacity-50"
                 >
-                  {groupNames.map(g => {
-                    const count = (localRules || []).filter(r => r.groupName && r.groupName.trim().toLowerCase() === g.trim().toLowerCase()).length;
-                    return (
-                      <option key={g} value={g}>
-                        {g} ({count}개 종속 거래처)
-                      </option>
-                    );
-                  })}
+                  {groupNames.length === 0 ? (
+                    <option value="">등록된 대표거래처 없음</option>
+                  ) : (
+                    groupNames.map(g => {
+                      const count = (localRules || []).filter(r => r.groupName && r.groupName.trim().toLowerCase() === g.trim().toLowerCase()).length;
+                      return (
+                        <option key={g} value={g}>
+                          {g} ({count}개 종속 거래처)
+                        </option>
+                      );
+                    })
+                  )}
                 </select>
 
                 {/* 빠른 선택 버튼 칩 (클릭 즉시 리렌더링) */}
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  {groupNames.map(g => (
-                    <button
-                      key={g}
-                      type="button"
-                      onClick={() => {
-                        setSelectedGroupName(g);
-                        setGroupName(g);
-                      }}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 ${
-                        selectedGroupName === g 
-                          ? 'bg-violet-600 text-white ring-2 ring-violet-400' 
-                          : 'bg-gray-800 hover:bg-gray-750 text-gray-300 hover:text-white'
-                      }`}
-                    >
-                      <Store className="w-3 h-3 text-violet-300" />
-                      <span>{g}</span>
-                    </button>
-                  ))}
+                  {groupNames.length === 0 ? (
+                    <span className="text-[11px] text-gray-500">등록된 대표거래처가 없습니다. 아래에서 새로 등록해 주세요.</span>
+                  ) : (
+                    groupNames.map(g => (
+                      <button
+                        key={g}
+                        type="button"
+                        onClick={() => {
+                          setSelectedGroupName(g);
+                          setGroupName(g);
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 ${
+                          selectedGroupName === g 
+                            ? 'bg-violet-600 text-white ring-2 ring-violet-400' 
+                            : 'bg-gray-800 hover:bg-gray-750 text-gray-300 hover:text-white'
+                        }`}
+                      >
+                        <Store className="w-3 h-3 text-violet-300" />
+                        <span>{g}</span>
+                      </button>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -512,7 +531,7 @@ export const GroupRulesManagerModal: React.FC<GroupRulesManagerModalProps> = ({
                   <span className="text-[9px] bg-violet-900/60 text-violet-300 px-1 py-0.2 rounded font-medium">선택됨</span>
                 </div>
                 <div className="font-bold text-violet-300 text-sm">
-                  {selectedGroupName}
+                  {selectedGroupName || '선택된 거래처 없음'}
                 </div>
               </div>
               <div className="h-6 w-px bg-gray-800 group-hover:bg-violet-800/50 transition" />
@@ -592,7 +611,7 @@ export const GroupRulesManagerModal: React.FC<GroupRulesManagerModalProps> = ({
                 list="groupRulesStoreList"
                 value={storeName}
                 onChange={(e) => setStoreName(e.target.value)}
-                placeholder="예: 호치강남, 호치겔러리 등"
+                placeholder="예: 상호명A, 직영1호점 등"
                 className="w-full border border-gray-700 rounded-lg p-2.5 bg-gray-900 text-gray-100 outline-none focus:ring-2 focus:ring-violet-500 font-medium"
               />
               <p className="text-[10px] text-gray-500 mt-0.5">실제 주문에 사용되는 개별 종속 상호명</p>
@@ -607,7 +626,7 @@ export const GroupRulesManagerModal: React.FC<GroupRulesManagerModalProps> = ({
                 required
                 value={groupName}
                 onChange={(e) => setGroupName(e.target.value)}
-                placeholder="예: 호치키스"
+                placeholder="예: 대표상호명"
                 className="w-full border border-gray-700 rounded-lg p-2.5 bg-gray-900 text-gray-100 outline-none focus:ring-2 focus:ring-violet-500 font-bold text-violet-300"
               />
               <p className="text-[10px] text-gray-500 mt-0.5">모든 주문을 통합 조회할 대표 거래처 상호</p>

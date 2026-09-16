@@ -55,7 +55,7 @@ export const getCollectionBillingStore = (
       // Exact match (whitespace & case insensitive)
       if (cleanName === cleanRuleStore) return true;
 
-      // Fallback: order name contains rule store or vice versa (e.g. "호치상남점" matches "호치상남")
+      // Fallback: order name contains rule store or vice versa (e.g. "상호명A지점" matches "상호명A")
       return cleanName.includes(cleanRuleStore) || cleanRuleStore.includes(cleanName);
     })
     .sort((a, b) => {
@@ -94,11 +94,11 @@ export const getGroupSubordinateStores = (
 /**
  * Checks if a transaction matches a search query with full group-awareness.
  * 
- * - If the query matches a representative store (e.g., "호치키스"),
- *   ALL orders belonging to "호치키스" AND its subordinate stores ("호치", "호치겔러리" 등) MATCH.
- * - If the query matches a subordinate store name (e.g., "호치"), it matches.
+ * - If the query matches a representative store (e.g., "대표상호A"),
+ *   ALL orders belonging to "대표상호A" AND its subordinate stores ("상호A-1", "상호A-2" 등) MATCH.
+ * - If the query matches a subordinate store name (e.g., "상호A-1"), it matches.
  * - Standard order properties (상가, 층, 호, 비고, 담당자 등) are also matched.
- * - Supports Korean initials (초성 검색: "ㅎㅊㅋㅅ" -> "호치키스") and whitespace insensitivity.
+ * - Supports Korean initials (초성 검색: "ㄷㅍㅅㅎ" -> "대표상호") and whitespace insensitivity.
  */
 export const matchesTransactionWithGroup = (
   t: Transaction,
