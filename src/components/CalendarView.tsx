@@ -216,13 +216,34 @@ export const CalendarView: React.FC<CalendarViewProps> = React.memo(({
         */
       >
         {/* Month Header & Nav */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-3">
             <h2 className="text-xl font-bold text-slate-900 tracking-tight">
               {year}년 {String(month + 1).padStart(2, '0')}월
             </h2>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap justify-end">
+            <div className="flex items-center gap-1.5 mr-1 sm:mr-2">
+              <button
+                type="button"
+                onClick={onOpenAiModal}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-3 h-8 rounded-xl flex items-center gap-1 transition shadow-sm"
+                title="AI로 텍스트에서 주문 자동 추출"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">빠른주문</span>
+              </button>
+              <button
+                type="button"
+                id="selectedDayAddButton"
+                onClick={onOpenAddModal}
+                className="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-3 h-8 rounded-xl flex items-center gap-1 transition shadow-sm"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>{isMerchant ? '주문 추가' : '신규 입력'}</span>
+              </button>
+            </div>
+            
             <button
               type="button"
               onClick={() => onChangeMonth(-1)}
@@ -345,26 +366,6 @@ export const CalendarView: React.FC<CalendarViewProps> = React.memo(({
             <h3 id="selectedDateTitle" className="font-bold text-slate-800 text-sm">
               {selectedDateStr} 사입 내역
             </h3>
-          </div>
-          <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onOpenAiModal}
-                className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1 transition shadow-sm"
-                title="AI로 텍스트에서 주문 자동 추출"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">빠른주문</span>
-              </button>
-              <button
-                type="button"
-                id="selectedDayAddButton"
-                onClick={onOpenAddModal}
-                className="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1 transition shadow-sm"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>{isMerchant ? '주문 추가' : '신규 입력'}</span>
-              </button>
           </div>
         </div>
 
