@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { X, Sparkles, Loader2, Zap, FileText, CheckCircle2, AlertCircle, Trash2, Edit3, ArrowRight } from 'lucide-react';
 import { Transaction } from '../types';
 import { normalizeMarketName, saveOrdersBulkToFirebase } from '../lib/firebase';
-import { parseSmartOrderText, ParsedOrderItem } from '../lib/orderParser';
+import { parseSmartOrderText, ParsedOrderItem, formatRoomDisplay } from '../lib/orderParser';
 
 interface AiOrderImportModalProps {
   isOpen: boolean;
@@ -80,7 +80,17 @@ export const AiOrderImportModal: React.FC<AiOrderImportModalProps> = ({
         let room = (order.room || '').trim();
 
         if (wholesaleStore && wholesaleStore !== '상호 미지정' && wholesaleStore !== '~') {
-          room = room ? `${room} (${wholesaleStore})` : wholesaleStore;
+          // 도매처 상호 끝의 불필요한 '호' 및 괄호 제거
+          const cleanWholesale = wholesaleStore.replace(/^\(|\)$/g, '').replace(/호+$/, '').trim();
+          if (cleanWholesale) {
+            let cleanRoom = room.replace(/\s*\([^)]*\)/g, '').trim();
+            if (cleanRoom && !cleanRoom.endsWith('호') && /^[a-zA-Z0-9\-\.]+$/.test(cleanRoom)) {
+              cleanRoom = `${cleanRoom}호`;
+            }
+            room = cleanRoom ? `${cleanRoom} (${cleanWholesale})` : `(${cleanWholesale})`;
+          }
+        } else if (room) {
+          room = formatRoomDisplay(room);
         }
 
         const remark = (order.remark || '').trim();

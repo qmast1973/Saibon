@@ -482,3 +482,58 @@ export function parseSmartOrderText(
 
   return results;
 }
+
+/**
+ * 호수 및 도매처 상호 표시 형식 통일 유틸리티
+ * 
+ * - 도매처 상호 뒤에 불필요하게 '호'가 붙는 문제 방지:
+ *   예) "(어반더스)호" -> "(어반더스)"
+ *   예) "12호 (어반더스)호" -> "12호 (어반더스)"
+ *   예) "12 (어반더스)" -> "12호 (어반더스)"
+ *   예) "어반더스" -> "(어반더스)"
+ *   예) "25" -> "25호"
+ *   예) "25호" -> "25호"
+ */
+export function formatRoomDisplay(rawRoom: string | null | undefined): string {
+  if (!rawRoom) return '';
+  let str = String(rawRoom).trim();
+  if (!str) return '';
+
+  // 1. 도매처 상호 괄호 뒤에 붙은 불필요한 '호' 제거: "(어반더스)호", "(어반더스) 호" -> "(어반더스)"
+  str = str.replace(/\)\s*호+$/g, ')');
+
+  // 2. 괄호로 둘러싸인 도매처 상호가 포함되어 있는 경우 (예: "12호 (어반더스)", "(어반더스)")
+  const parenMatch = str.match(/^(.*?)\s*(\([^)]+\))$/);
+  if (parenMatch) {
+    let roomPart = parenMatch[1].trim();
+    let storePart = parenMatch[2].trim();
+
+    // 괄호 안쪽 끝에 잘못 붙은 '호' 제거 (예: "(어반더스호)" -> "(어반더스)")
+    storePart = storePart.replace(/^(\([^)]+?)호\)$/, '$1)');
+
+    if (!roomPart) {
+      return storePart;
+    }
+
+    // 앞부분 호수에 '호' 붙이기 (순수 숫자 or 알파벳+숫자 or 하이픈 조합일 때)
+    if (!roomPart.endsWith('호') && /^[a-zA-Z0-9\-\.\s]+$/.test(roomPart)) {
+      roomPart = `${roomPart.replace(/\s+/g, '')}호`;
+    }
+
+    return `${roomPart} ${storePart}`;
+  }
+
+  // 3. 괄호가 없는 경우
+  // 이미 끝이 '호'로 끝나면 그대로 반환
+  if (str.endsWith('호')) {
+    return str;
+  }
+
+  // 순수 숫자(25)나 알파벳/숫자 조합(F10, 1-12)인 경우에만 '호'를 붙임
+  if (/^[a-zA-Z0-9\-\.]+$/.test(str)) {
+    return `${str}호`;
+  }
+
+  // 한글 등이 포함된 단독 도매 상호인 경우 (예: "어반더스") -> "(어반더스)" 형태로 감싸줌
+  return str.startsWith('(') && str.endsWith(')') ? str : `(${str})`;
+}

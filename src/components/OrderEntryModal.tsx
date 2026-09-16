@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Transaction, User, CollectionGroupRule } from '../types';
 import { saveOrderToFirebase, normalizeMarketName } from '../lib/firebase';
+import { formatRoomDisplay } from '../lib/orderParser';
 import { SearchWithGroupDropdown } from './SearchWithGroupDropdown';
 import { Plus, Trash2, Edit3, X, Check, Sparkles } from 'lucide-react';
 
@@ -123,7 +124,7 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
           store: store.trim(),
           market: normalizeMarketName(r.market, r.room),
           floor: r.floor.trim(),
-          room: r.room.trim(),
+          room: formatRoomDisplay(r.room),
           manager: editingTransaction?.manager || "",
           region: editingTransaction?.region || "",
           expense: editingTransaction?.expense || 0,
@@ -146,7 +147,7 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
             store: store.trim(),
             market: normalizeMarketName(r.market, r.room),
             floor: r.floor.trim(),
-            room: r.room.trim(),
+            room: formatRoomDisplay(r.room),
             manager: "",
             region: "",
             expense: editingTransaction?.expense || 0,
@@ -382,7 +383,7 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
                     <span className="font-bold text-gray-500 w-4">{i + 1}.</span>
                     <span className="font-semibold text-gray-100">{r.market || '-'}</span>
                     <span>{String(r.floor || '').replace(/층$/, '') ? `${String(r.floor || '').replace(/층$/, '')}층` : ''}</span>
-                    <span>{r.room ? `${r.room}` : ''}</span>
+                    <span>{r.room ? formatRoomDisplay(r.room) : ''}</span>
                   </div>
                 ))
               ) : (

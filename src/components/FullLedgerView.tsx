@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Transaction, User } from '../types';
 import { formatMoney } from '../lib/firebase';
+import { formatRoomDisplay } from '../lib/orderParser';
 import { Table, Edit3, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 
 interface FullLedgerViewProps {
@@ -98,7 +99,7 @@ export const FullLedgerView: React.FC<FullLedgerViewProps> = React.memo(({
                   <td className="p-3 text-slate-500 whitespace-nowrap">{t.region || '-'}</td>
                   <td className="p-3 font-bold text-slate-900 whitespace-nowrap">{t.store || '-'}</td>
                   <td className="p-3 text-slate-600 whitespace-nowrap">
-                    <b>{t.market || ''}</b> {String(t.floor || '').replace(/층$/, '') ? `${String(t.floor || '').replace(/층$/, '')}층` : ''} {String(t.room || '').replace(/호$/, '') ? `${String(t.room || '').replace(/호$/, '')}호` : ''}
+                    <b>{t.market || ''}</b> {String(t.floor || '').replace(/층$/, '') ? `${String(t.floor || '').replace(/층$/, '')}층` : ''} {formatRoomDisplay(t.room)}
                   </td>
                   <td className="p-3 text-right font-semibold text-rose-600 whitespace-nowrap font-mono">
                     {formatMoney(t.expense)}

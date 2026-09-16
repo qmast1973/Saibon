@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Transaction, User, CollectionGroupRule } from '../types';
 import { formatMoney, normalizeDateStr } from '../lib/firebase';
 import { getCollectionBillingStore, sortTransactionsBySubStoreClick } from '../lib/groupRules';
+import { formatRoomDisplay } from '../lib/orderParser';
 import { ChevronLeft, ChevronRight, CalendarCheck, Plus, Edit, Trash2, CheckCircle2, Sparkles, Layers, X } from 'lucide-react';
 import Holidays from 'date-holidays';
 
@@ -174,6 +175,8 @@ export const CalendarView: React.FC<CalendarViewProps> = React.memo(({
       return sum + (exp < 0 ? Math.abs(exp) : 0) + (inc > 0 ? inc : 0);
     }, 0);
   }, [financialDayTxs]);
+  /*
+  // [사용자 요청 비활성화] 달력 스와이프 월 이동 기능 주석 처리 (스크롤/터치 오작동 방지)
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [touchEndX, setTouchEndX] = useState<number | null>(null);
   const minSwipeDistance = 50;
@@ -199,15 +202,18 @@ export const CalendarView: React.FC<CalendarViewProps> = React.memo(({
       onChangeMonth(-1);
     }
   };
+  */
 
   return (
     <section className="flex-1 flex flex-col lg:flex-row gap-4">
       {/* Left: Monthly Calendar Grid */}
       <div 
         className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 flex flex-col"
+        /*
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
+        */
       >
         {/* Month Header & Nav */}
         <div className="flex items-center justify-between mb-4">
@@ -499,7 +505,7 @@ export const CalendarView: React.FC<CalendarViewProps> = React.memo(({
 
                   <div className="text-slate-500 text-[11px] flex items-center gap-2">
                     <span>
-                      <b className="text-slate-700">{t.market || '-'}</b> {String(t.floor || '').replace(/층$/, '') ? `${String(t.floor || '').replace(/층$/, '')}층` : ''} {String(t.room || '').replace(/호$/, '') ? `${String(t.room || '').replace(/호$/, '')}호` : ''}
+                      <b className="text-slate-700">{t.market || '-'}</b> {String(t.floor || '').replace(/층$/, '') ? `${String(t.floor || '').replace(/층$/, '')}층` : ''} {formatRoomDisplay(t.room)}
                     </span>
                     {t.region && <span className="text-slate-400">| {t.region}</span>}
                   </div>

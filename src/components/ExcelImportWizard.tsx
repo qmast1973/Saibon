@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Transaction, User, UserRole } from '../types';
 import { normalizeMarketName, normalizeDateStr } from '../lib/firebase';
+import { formatRoomDisplay } from '../lib/orderParser';
 import { Coins, CalendarCheck, UserCheck, ArrowRight, X, Check } from 'lucide-react';
 
 interface ExcelImportWizardProps {
@@ -169,7 +170,7 @@ export const ExcelImportWizard: React.FC<ExcelImportWizardProps> = ({
         store: String(r.store || '').trim(),
         market: normalizeMarketName(r.market || '', r.room || ''),
         floor: String(r.floor || '').trim(),
-        room: String(r.room || '').trim(),
+        room: formatRoomDisplay(String(r.room || '')),
         expense,
         income,
         status: String(r.status || '').trim(),

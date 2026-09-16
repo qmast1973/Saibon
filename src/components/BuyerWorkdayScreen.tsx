@@ -10,6 +10,7 @@ import {
   formatMoney
 } from '../lib/firebase';
 import { getKoreanInitials } from '../lib/groupRules';
+import { formatRoomDisplay } from '../lib/orderParser';
 import {
   Building2,
   Calendar,
@@ -614,7 +615,7 @@ export const BuyerWorkdayScreen: React.FC<BuyerWorkdayScreenProps> = React.memo(
                             {String(order.floor || '').replace(/층$/, '') ? `${String(order.floor || '').replace(/층$/, '')}층` : ''}
                           </span>
                           <span className="text-white ml-1 font-mono">
-                            {String(order.room || '').replace(/호$/, '') ? `${String(order.room || '').replace(/호$/, '')}호` : ''}
+                            {formatRoomDisplay(order.room)}
                           </span>
                         </div>
                         

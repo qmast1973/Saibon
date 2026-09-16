@@ -12,6 +12,7 @@ import {
   formatMoney
 } from '../lib/firebase';
 import { matchesTransactionWithGroup, getCollectionBillingStore } from '../lib/groupRules';
+import { formatRoomDisplay } from '../lib/orderParser';
 import {
   Building2,
   Calendar,
@@ -408,7 +409,7 @@ export const BuyerWorkdayStatsScreen: React.FC<BuyerWorkdayStatsScreenProps> = R
         소매상호: order.store || '',
         도매건물: order.market || '',
         층: order.floor || '',
-        호수: order.room || '',
+        호수: formatRoomDisplay(order.room),
         수량: count,
         대납금: Number((order.expense || 0) * 1000),
         입금액: Number((order.income || 0) * 1000),

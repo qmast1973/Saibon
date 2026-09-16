@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Transaction, CollectionGroupRule } from '../types';
 import { Layers, X, Edit3, Trash2, Plus, ChevronDown, ChevronUp, Store, ArrowDownAZ } from 'lucide-react';
 import { normalizeMarketName, formatMoney } from '../lib/firebase';
+import { formatRoomDisplay } from '../lib/orderParser';
 import { getSubStoresForRepresentative, sortStoreGroupsBySubStoreClick, sortTransactionsBySubStoreClick } from '../lib/groupRules';
 
 export interface StoreGroup {
@@ -474,7 +475,7 @@ export const CollectionList: React.FC<CollectionListProps> = ({
                           )}
                           {(t.floor || t.room) && (
                             <span className={`text-[11px] font-medium shrink-0 ${mFloorBadge} px-1.5 py-0.5 rounded`}>
-                              {t.floor}{t.floor && t.room ? '-' : ''}{t.room}
+                              {t.floor}{t.floor && t.room ? (formatRoomDisplay(t.room).startsWith('(') ? ' ' : '-') : ''}{formatRoomDisplay(t.room)}
                             </span>
                           )}
                           <span className={`text-[13px] font-bold ${mStoreName} shrink-0`}>
