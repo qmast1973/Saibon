@@ -1,8 +1,10 @@
 import React, { useEffect } from 'react';
-import { Database, Layers, Users, Settings } from 'lucide-react';
+import { Database, Layers, Users, Settings, HandCoins } from 'lucide-react';
 
 interface SettingsModalProps {
   onClose: () => void;
+  includeFee?: boolean;
+  onToggleIncludeFee?: (val: boolean) => void;
   onOpenDataManagement?: () => void;
   onOpenGroupRules?: () => void;
   onOpenAdminManagement?: () => void;
@@ -11,6 +13,8 @@ interface SettingsModalProps {
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
+  includeFee = true,
+  onToggleIncludeFee,
   onOpenDataManagement,
   onOpenGroupRules,
   onOpenAdminManagement,
@@ -47,6 +51,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Action Buttons Container */}
         <div className="flex flex-col gap-3 overflow-y-auto pr-1 overscroll-contain">
+          
+          {/* Include Fee Toggle */}
+          {onToggleIncludeFee && (
+            <label className="w-full flex items-center justify-between bg-gray-800/50 hover:bg-gray-800 border border-gray-700 p-4 rounded-xl transition-all cursor-pointer group">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-gray-800 group-hover:bg-gray-700 flex items-center justify-center transition-colors shrink-0">
+                  <HandCoins className="w-5 h-5 text-gray-400 group-hover:text-amber-300" />
+                </div>
+                <div className="text-left">
+                  <div className="font-bold text-gray-200 group-hover:text-white text-sm flex items-center gap-2">
+                    사입비 포함 처리
+                    <input 
+                      type="checkbox" 
+                      className="hidden"
+                      checked={includeFee}
+                      onChange={(e) => onToggleIncludeFee(e.target.checked)}
+                    />
+                    <div className={`w-8 h-4 sm:w-10 sm:h-5 rounded-full transition-colors relative flex items-center ${includeFee ? 'bg-indigo-500' : 'bg-gray-600'}`}>
+                      <div className={`w-3 h-3 sm:w-4 sm:h-4 bg-white rounded-full absolute shadow transition-transform ${includeFee ? 'translate-x-4 sm:translate-x-5' : 'translate-x-1'}`}></div>
+                    </div>
+                  </div>
+                  <div className="text-[11px] text-gray-500 mt-0.5 leading-tight">
+                    {includeFee ? '체크됨: 수금 화면에서 사입비(수수료)가 함께 계산됩니다.' : '체크 해제됨: 사입비 없이 대납금/미수금만 표시됩니다.'}
+                  </div>
+                </div>
+              </div>
+            </label>
+          )}
+
           {hasAdminAccess && onOpenDataManagement && (
             <button
               type="button"

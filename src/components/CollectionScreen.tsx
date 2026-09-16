@@ -12,6 +12,7 @@ interface CollectionScreenProps {
   currentUser: User | null;
   users: User[];
   collectionGroupRules: CollectionGroupRule[];
+  includeFee?: boolean;
   onClose: () => void;
   onSaveCollection: (collection: CollectionRecord | CollectionRecord[]) => void;
   onOpenGroupManager?: () => void;
@@ -31,6 +32,7 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
   currentUser,
   users,
   collectionGroupRules,
+  includeFee = true,
   onClose,
   onSaveCollection,
   onOpenGroupManager,
@@ -126,7 +128,37 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
       });
   }, [transactions, dateFilter, collectionGroupRules]);
 
-  const totalBilled = useMemo(() => ledgerRows.reduce((a, t) => a + t._expense, 0), [ledgerRows]);
+  const totalFees = useMemo(() => {
+    if (!includeFee) return 0;
+    const map = new Map<string, { completedCount: number; isMonthlyPurchase: boolean }>();
+    
+    ledgerRows.forEach(t => {
+      const key = t._billingStore;
+      if (!map.has(key)) {
+        let isMonthlyPurchase = false;
+        if (collectionGroupRules) {
+          const rule = collectionGroupRules.find(r => (r.groupName || '').trim() === key && r.isMonthlyPurchase);
+          if (rule) isMonthlyPurchase = true;
+        }
+        if (!isMonthlyPurchase) {
+          const merchantUser = users.find(u => u.role === 'merchant' && u.storeName === key && u.isMonthlyPurchase);
+          if (merchantUser) isMonthlyPurchase = true;
+        }
+        map.set(key, { completedCount: 0, isMonthlyPurchase });
+      }
+      
+      const isOrder = normalizeMarketName(t.market || '') !== '입금' && normalizeMarketName(t.market || '') !== '미수금';
+      if (isOrder && (t._expense > 0 || (t._expense === 0 && t._income === 0))) {
+        if ((t.status || '').trim() !== '') {
+          map.get(key)!.completedCount += 1;
+        }
+      }
+    });
+    
+    return Array.from(map.values()).reduce((sum, g) => sum + (!g.isMonthlyPurchase ? g.completedCount * 4 : 0), 0);
+  }, [ledgerRows, includeFee, collectionGroupRules, users]);
+
+  const totalBilled = useMemo(() => ledgerRows.reduce((a, t) => a + t._expense, 0) + totalFees, [ledgerRows, totalFees]);
   const totalPaid = useMemo(() => ledgerRows.reduce((a, t) => a + t._income, 0), [ledgerRows]);
   const totalDue = useMemo(() => Math.max(0, totalBilled - totalPaid), [totalBilled, totalPaid]);
 
@@ -245,7 +277,11 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
       const isOrder = normalizeMarketName(t.market || '') !== '입금' && normalizeMarketName(t.market || '') !== '미수금';
       if (isOrder && (t._expense > 0 || (t._expense === 0 && t._income === 0))) {
         g.orderCount += 1;
-        if ((t.status || '').trim() !== '') {
+        
+        const hasStatus = (t.status || '').trim() !== '';
+        const isCompletedForFee = (hasStatus && !t.isFeeExcluded) || !!t.isFeeIncluded;
+        
+        if (isCompletedForFee) {
           g.completedCount += 1;
         } else {
           g.unprocessedCount += 1;
@@ -522,6 +558,7 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
             groups={groups} 
             allTransactions={filteredRows}
             collectionGroupRules={collectionGroupRules || []}
+            includeFee={includeFee}
             mode="collection" 
             theme="dark" 
             onToggleComplete={handleToggleComplete}
@@ -544,7 +581,7 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
         {/* Collection Entry Modal */}
         {showEntryModal && (() => {
           const matchedGroup = groups.find(g => g.store === entryStore);
-          const fee = matchedGroup && !matchedGroup.isMonthlyPurchase ? matchedGroup.completedCount * 4 : 0;
+          const fee = includeFee && matchedGroup && !matchedGroup.isMonthlyPurchase ? matchedGroup.completedCount * 4 : 0;
           
           return (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[190] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
@@ -610,7 +647,7 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
                       <div className="absolute z-10 w-full mt-1 bg-gray-900 border border-gray-800 rounded-xl shadow-lg max-h-48 overflow-y-auto">
                         {filteredStoresForEntry.map((storeName, idx) => {
                           const grp = groupMap.get(storeName);
-                          const fee = grp && !grp.isMonthlyPurchase ? grp.completedCount * 4 : 0;
+                          const fee = includeFee && grp && !grp.isMonthlyPurchase ? grp.completedCount * 4 : 0;
                           const balance = grp ? Math.max(0, grp.billed + fee - grp.paid) : 0;
                           const subStores = getSubStoresForRepresentative(storeName, collectionGroupRules || []);
                           const repStore = getCollectionBillingStore(storeName, collectionGroupRules || []);

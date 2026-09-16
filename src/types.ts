@@ -56,6 +56,8 @@ export interface Transaction {
   itemCount?: number; // 물건 갯수
   isReturn?: boolean;
   status?: string; // e.g. 미송, 반품, 교환, 찾기, 주고옴, 매입처리, 완료, etc.
+  isFeeExcluded?: boolean; // 수금화면에서 사입비(수수료) 부과 대상에서 제외할 경우 true (미처리 전환)
+  isFeeIncluded?: boolean; // 수금화면에서 사입비(수수료) 부과 대상으로 강제 포함할 경우 true (완료 처리)
   remark?: string; // 비고 (주문 품목 및 수량 등)
   processingRemark?: string; // 처리 비고 (삼촌 입력란)
   recordType?: 'order' | 'receivable';

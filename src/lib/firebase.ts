@@ -604,8 +604,8 @@ export function syncFirebaseOrders(onOrdersUpdate: (orders: Transaction[]) => vo
         Object.entries(dayOrders).forEach(([firebaseId, order]: [string, any]) => {
           if (!order) return;
           const storeName = String(order?.상호 || '').trim();
-          const payment = Number(String(order?.대납금 ?? '').replace(/,/g, '').replace(/,000원?$/, '').trim()) || 0;
-          const income = Number(String(order?.입금액 ?? '').replace(/,/g, '').replace(/,000원?$/, '').trim()) || 0;
+          const payment = Number(String(order?.대납금 ?? '').replace(/,000원?$/, '').replace(/,/g, '').replace(/원$/, '').trim()) || 0;
+          const income = Number(String(order?.입금액 ?? '').replace(/,000원?$/, '').replace(/,/g, '').replace(/원$/, '').trim()) || 0;
 
           // 삭제: 상호 없고 대납금, 미수금 없는 건수
           if (!storeName && payment === 0 && income === 0) {

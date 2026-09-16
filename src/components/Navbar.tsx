@@ -6,6 +6,8 @@ import { SettingsModal } from './SettingsModal';
 
 interface NavbarProps {
   currentUser: User | null;
+  includeFee?: boolean;
+  onToggleIncludeFee?: (val: boolean) => void;
   onOpenDataManagement: () => void;
   onOpenProfile: () => void;
   onOpenMerchantInfo: () => void;
@@ -19,6 +21,8 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({
   currentUser,
+  includeFee,
+  onToggleIncludeFee,
   onOpenDataManagement,
   onOpenProfile,
   onOpenMerchantInfo,
@@ -180,6 +184,8 @@ export const Navbar: React.FC<NavbarProps> = ({
       {showSettings && (
         <SettingsModal
           onClose={() => setShowSettings(false)}
+          includeFee={includeFee}
+          onToggleIncludeFee={onToggleIncludeFee}
           onOpenDataManagement={onOpenDataManagement}
           onOpenGroupRules={onOpenGroupRules}
           onOpenAdminManagement={onOpenAdminManagement}

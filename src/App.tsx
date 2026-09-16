@@ -69,6 +69,11 @@ export default function App() {
   // App Navigation & Selection State
   const [selectedDateStr, setSelectedDateStr] = useState<string>(getBusinessDate());
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  
+  // Settings State
+  const [includeFee, setIncludeFee] = useState<boolean>(() => {
+    return localStorage.getItem('setting_include_fee') !== 'false';
+  });
 
   // Filter State (Search Only)
   const [searchQuery, setSearchQuery] = useState('');
@@ -560,8 +565,14 @@ export default function App() {
     setTransactions(prev => {
       const updated = prev.map(t => {
         if (t.id === id) {
-          const isComp = (t.status || '').trim() !== '';
-          targetTx = { ...t, status: isComp ? '' : '완료' };
+          const hasStatus = (t.status || '').trim() !== '';
+          const currentlyCompletedForFee = (hasStatus && !t.isFeeExcluded) || !!t.isFeeIncluded;
+          
+          targetTx = {
+            ...t,
+            isFeeExcluded: currentlyCompletedForFee,
+            isFeeIncluded: !currentlyCompletedForFee
+          };
           return targetTx;
         }
         return t;
@@ -749,7 +760,7 @@ export default function App() {
           market: findIdx(['건물', '시장', '상가', '건물명', '도매', 'market'], 4),
           floor: findIdx(['층', '층수', 'floor'], 5),
           room: findIdx(['호수', '호', 'room'], 6),
-          expense: findIdx(['대납', '대납금', '대납액', '지출', '사입금', '금액', '합계', 'expense'], 7),
+          expense: findIdx(['대납', '대납금', '대납액', '지출', '사입금', 'expense'], 7),
           income: findIdx(['입금', '입금액', '수금', '수금액', 'income'], -1),
           status: findIdx(['상태', '완료', '진행', '구분', '완료여부', 'status'], -1),
           remark: findIdx(['비고', '메모', '특이사항', '내용', 'remark', 'memo'], -1)
@@ -915,6 +926,11 @@ export default function App() {
       {/* Top Navbar */}
       <Navbar
         currentUser={currentUser}
+        includeFee={includeFee}
+        onToggleIncludeFee={(val) => {
+          setIncludeFee(val);
+          localStorage.setItem('setting_include_fee', String(val));
+        }}
         onOpenDataManagement={() => setShowDataManagementModal(true)}
         onOpenBuildingManagement={() => setShowBuildingManagerModal(true)}
         onOpenProfile={() => {
@@ -923,17 +939,9 @@ export default function App() {
         }}
         onOpenMerchantInfo={() => setShowMerchantInfoModal(true)}
         onOpenCollectionScreen={() => {
-          if (roleFilteredTransactions.length > 0) {
-            const maxDate = roleFilteredTransactions.map(t => t.date).sort().reverse()[0];
-            if (maxDate) setSelectedDateStr(maxDate);
-          }
           setShowCollectionScreen(true);
         }}
         onOpenBuyerWorkday={() => {
-          if (roleFilteredTransactions.length > 0) {
-            const maxDate = roleFilteredTransactions.map(t => t.date).sort().reverse()[0];
-            if (maxDate) setSelectedDateStr(maxDate);
-          }
           setShowBuyerWorkdayScreen(true);
         }}
         onOpenAdminManagement={() => setShowAdminUserManagementModal(true)}
@@ -1123,6 +1131,7 @@ export default function App() {
       {showCollectionScreen && (
         <CollectionScreen
           initialDate={selectedDateStr}
+          includeFee={includeFee}
           transactions={roleFilteredTransactions}
           collections={collections}
           currentUser={currentUser}

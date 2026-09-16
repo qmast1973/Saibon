@@ -32,6 +32,7 @@ interface CollectionListProps {
   groups: StoreGroup[];
   allTransactions?: Transaction[]; // alternative to orders in group, used to filter on the fly
   collectionGroupRules?: CollectionGroupRule[];
+  includeFee?: boolean;
   mode: 'collection' | 'stats';
   theme: 'light' | 'dark';
   
@@ -46,6 +47,7 @@ export const CollectionList: React.FC<CollectionListProps> = ({
   groups,
   allTransactions,
   collectionGroupRules = [],
+  includeFee = true,
   mode,
   theme,
   onOpenOrderDetail,
@@ -143,7 +145,7 @@ export const CollectionList: React.FC<CollectionListProps> = ({
                 </tr>
               ) : (
                 sortedGroups.map((g, i) => {
-                  const fee = mode === 'collection' && !g.isMonthlyPurchase ? g.completedCount * 4 : 0;
+                  const fee = mode === 'collection' && includeFee && !g.isMonthlyPurchase ? g.completedCount * 4 : 0;
                   const balance = mode === 'collection' ? Math.max(0, (g.billed || 0) + fee - (g.paid || 0)) : 0;
                   const subStores = getSubStoresForRepresentative(g.store, collectionGroupRules);
                   const isExpanded = !!expandedSubStoreRows[g.store];
@@ -456,7 +458,9 @@ export const CollectionList: React.FC<CollectionListProps> = ({
                 ) : (
                   displayedOrders.map(t => {
                     const isDeposit = normalizeMarketName(t.market || '') === '입금';
-                    const isCompleted = (t.status || '').trim() !== '';
+                    const hasStatus = (t.status || '').trim() !== '';
+                    const isCompleted = (hasStatus && !t.isFeeExcluded) || !!t.isFeeIncluded;
+                    
                     const expense = mode === 'collection' ? (t as any)._expense : Number(t.expense);
                     const income = mode === 'collection' ? (t as any)._income : Number(t.income);
 
@@ -478,7 +482,7 @@ export const CollectionList: React.FC<CollectionListProps> = ({
                               isCompleted ? mStatusCompleted : mStatusPending
                             }`}>
                               {isCompleted ? '완료' : '미처리'}
-                              {t.status && t.status !== '완료' && t.status !== '미처리' ? ` (${t.status})` : ''}
+                              {t.status && (isCompleted ? t.status !== '완료' : true) ? ` (${t.status})` : ''}
                             </span>
                           )}
                           {(t.floor || t.room) && (
