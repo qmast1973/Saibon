@@ -1186,6 +1186,7 @@ export default function App() {
           editingTransaction={editingTransaction}
           currentUser={currentUser}
           selectedDate={selectedDateStr}
+          existingTransactions={roleFilteredTransactions}
           onOpenAiModal={() => {
             setShowOrderModal(false);
             setShowAiModal(true);

@@ -271,7 +271,7 @@ export const CalendarView: React.FC<CalendarViewProps> = React.memo(({
               <button
                 type="button"
                 onClick={onOpenWorkdayStats}
-                className="h-8 px-3 rounded-xl bg-pink-50 hover:bg-pink-100 border border-pink-200 text-pink-700 text-xs font-bold transition flex items-center gap-1"
+                className="w-[88px] h-[35px] rounded-xl bg-pink-50 hover:bg-pink-100 border border-pink-200 text-pink-700 text-[15px] leading-[18px] font-bold text-center flex items-center justify-center gap-1 transition"
               >
                 <span>📊</span> 갯수 집계
               </button>

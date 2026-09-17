@@ -13,6 +13,7 @@ interface OrderEntryModalProps {
   allMarkets: string[];
   bundledStores?: string[];
   collectionGroupRules?: CollectionGroupRule[];
+  existingTransactions?: Transaction[];
   onClose: () => void;
   onOrderSaved: (savedOrders: Transaction[]) => void;
   onOrderCompleted?: (transactionId: string) => void;
@@ -33,6 +34,7 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
   allMarkets,
   bundledStores = [],
   collectionGroupRules = [],
+  existingTransactions = [],
   onClose,
   onOrderSaved,
   onOrderCompleted,
@@ -108,6 +110,40 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
       if (r.market.trim() === '===== 남대문 =====') {
         alert('올바른 건물명을 입력해주세요.');
         return;
+      }
+    }
+
+    if (!isEditMode) {
+      const duplicates = [];
+      for (const r of validRows) {
+        const normMarket = normalizeMarketName(r.market, r.room);
+        const normRoom = formatRoomDisplay(r.room);
+        
+        const isDuplicate = existingTransactions.some(t => {
+          const tDate = t.date || t.businessDate;
+          const tMarket = normalizeMarketName(t.market || '', t.room || '');
+          const tRoom = formatRoomDisplay(t.room || '');
+          const tStore = (t.store || '').trim();
+          
+          return tDate === date &&
+                 tStore === store.trim() &&
+                 tMarket === normMarket &&
+                 tRoom === normRoom &&
+                 t.recordType !== 'receivable' &&
+                 tMarket !== '입금' &&
+                 tMarket !== '미수금';
+        });
+
+        if (isDuplicate) {
+          duplicates.push(`${normMarket} ${r.floor} ${normRoom}`);
+        }
+      }
+
+      if (duplicates.length > 0) {
+        const confirmResult = window.confirm(`[중복 주문 알림]\n상호: ${store.trim()}\n\n아래 건물/호수에 대한 주문이 이미 존재합니다.\n- ${duplicates.join('\n- ')}\n\n계속해서 추가 등록을 진행하시겠습니까?`);
+        if (!confirmResult) {
+          return;
+        }
       }
     }
 
