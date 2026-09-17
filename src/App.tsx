@@ -1175,6 +1175,7 @@ export default function App() {
           onClose={() => setShowAiModal(false)}
           selectedDateStr={selectedDateStr}
           currentUser={currentUser}
+          existingTransactions={roleFilteredTransactions}
           onImportOrders={(orders) => {
             setCleanTransactions([...transactions, ...orders]);
           }}

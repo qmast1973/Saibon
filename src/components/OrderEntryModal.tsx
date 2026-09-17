@@ -3,7 +3,7 @@ import { Transaction, User, CollectionGroupRule } from '../types';
 import { saveOrderToFirebase, normalizeMarketName } from '../lib/firebase';
 import { formatRoomDisplay } from '../lib/orderParser';
 import { SearchWithGroupDropdown } from './SearchWithGroupDropdown';
-import { Plus, Trash2, Edit3, X, Check, Sparkles } from 'lucide-react';
+import { Plus, Trash2, Edit3, X, Check, Sparkles, AlertCircle } from 'lucide-react';
 
 interface OrderEntryModalProps {
   editingTransaction: Transaction | null;
@@ -56,6 +56,7 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
   const [date, setDate] = useState(editingTransaction?.date || selectedDate);
   const [store, setStore] = useState(editingTransaction?.store || (isMerchant ? currentUser?.storeName || '' : ''));
   const [remark, setRemark] = useState(editingTransaction?.remark || '');
+  const [duplicateAlert, setDuplicateAlert] = useState<string[] | null>(null);
           
   const [orderRows, setOrderRows] = useState<OrderRowItem[]>(
     isEditMode
@@ -90,8 +91,8 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
 
   const validRows = orderRows.filter(r => r.market.trim() || r.floor.trim() || r.room.trim());
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent, skipCheck: boolean = false) => {
+    if (e) e.preventDefault();
     if (!date || !store.trim()) {
       alert('날짜와 상호명을 입력해주세요.');
       return;
@@ -113,7 +114,7 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
       }
     }
 
-    if (!isEditMode) {
+    if (!isEditMode && !skipCheck) {
       const duplicates = [];
       for (const r of validRows) {
         const normMarket = normalizeMarketName(r.market, r.room);
@@ -140,10 +141,8 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
       }
 
       if (duplicates.length > 0) {
-        const confirmResult = window.confirm(`[중복 주문 알림]\n상호: ${store.trim()}\n\n아래 건물/호수에 대한 주문이 이미 존재합니다.\n- ${duplicates.join('\n- ')}\n\n계속해서 추가 등록을 진행하시겠습니까?`);
-        if (!confirmResult) {
-          return;
-        }
+        setDuplicateAlert(duplicates);
+        return;
       }
     }
 
@@ -471,6 +470,41 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
           </div>
         </form>
       </div>
+
+      {duplicateAlert && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <h4 className="text-rose-500 font-bold mb-3 text-lg flex items-center gap-2">
+              <AlertCircle className="w-5 h-5" /> 중복 주문 알림 ({duplicateAlert.length}건)
+            </h4>
+            <p className="text-gray-300 text-sm mb-4">
+              아래 건물/호수에 대한 주문이 이미 존재합니다.
+            </p>
+            <ul className="text-xs text-rose-300 mb-6 space-y-1 bg-gray-800 p-3 rounded-lg overflow-y-auto max-h-40 border border-gray-700">
+              {duplicateAlert.map((d, i) => <li key={i}>- {d}</li>)}
+            </ul>
+            <p className="text-gray-300 text-sm mb-6 font-bold">
+              계속해서 추가 등록을 진행하시겠습니까?
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button 
+                type="button" 
+                onClick={() => setDuplicateAlert(null)} 
+                className="px-4 py-2.5 bg-gray-700 hover:bg-gray-600 rounded-xl text-white font-semibold text-sm transition"
+              >
+                아니오, 취소할게요
+              </button>
+              <button 
+                type="button" 
+                onClick={() => { setDuplicateAlert(null); handleSubmit(undefined, true); }} 
+                className="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 rounded-xl text-white font-bold text-sm shadow-md transition"
+              >
+                네, 추가로 등록합니다
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -10,6 +10,7 @@ interface AiOrderImportModalProps {
   selectedDateStr: string;
   onImportOrders: (newOrders: Transaction[]) => void;
   currentUser: any;
+  existingTransactions?: Transaction[];
 }
 
 export const AiOrderImportModal: React.FC<AiOrderImportModalProps> = ({
@@ -17,7 +18,8 @@ export const AiOrderImportModal: React.FC<AiOrderImportModalProps> = ({
   onClose,
   selectedDateStr,
   onImportOrders,
-  currentUser
+  currentUser,
+  existingTransactions = []
 }) => {
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -31,6 +33,7 @@ export const AiOrderImportModal: React.FC<AiOrderImportModalProps> = ({
   const [parsedRows, setParsedRows] = useState<ParsedOrderItem[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [duplicateAlert, setDuplicateAlert] = useState<{ duplicates: string[], txs: Transaction[] } | null>(null);
 
   // 텍스트가 바뀔 때마다 실시간으로 자동 분석 수행
   useEffect(() => {
@@ -62,8 +65,8 @@ export const AiOrderImportModal: React.FC<AiOrderImportModalProps> = ({
     setParsedRows(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleProcessAndSave = async () => {
-    if (parsedRows.length === 0) {
+  const handleProcessAndSave = async (skipCheck = false, prebuiltTransactions?: Transaction[]) => {
+    if (!skipCheck && parsedRows.length === 0) {
       setErrorMsg('등록할 주문 항목이 없습니다. 텍스트를 입력해주세요.');
       return;
     }
@@ -72,7 +75,7 @@ export const AiOrderImportModal: React.FC<AiOrderImportModalProps> = ({
     setErrorMsg(null);
 
     try {
-      const newTransactions: Transaction[] = parsedRows.map((order, index) => {
+      let newTransactions: Transaction[] = prebuiltTransactions || parsedRows.map((order, index) => {
         const market = normalizeMarketName(order.market || '', order.room || '');
         const retailStore = (order.groupStore || defaultStore || '상호 미지정').trim();
         const wholesaleStore = (order.store || '').trim();
@@ -120,6 +123,37 @@ export const AiOrderImportModal: React.FC<AiOrderImportModalProps> = ({
           importedFromFirebase: true
         };
       });
+
+      // Check for duplicates
+      let duplicates: string[] = [];
+      if (!skipCheck) {
+        for (const newTx of newTransactions) {
+          const isDuplicate = existingTransactions.some(t => {
+            const tDate = t.date || t.businessDate;
+            const tMarket = normalizeMarketName(t.market || '', t.room || '');
+            const tRoom = formatRoomDisplay(t.room || '');
+            const tStore = (t.store || '').trim();
+            
+            return tDate === newTx.date &&
+                   tStore === (newTx.store || '').trim() &&
+                   tMarket === (newTx.market || '').trim() &&
+                   tRoom === (newTx.room || '').trim() &&
+                   t.recordType !== 'receivable' &&
+                   tMarket !== '입금' &&
+                   tMarket !== '미수금';
+          });
+
+          if (isDuplicate) {
+            duplicates.push(`${newTx.store} - ${newTx.market} ${newTx.floor} ${newTx.room}`);
+          }
+        }
+
+        if (duplicates.length > 0) {
+          setDuplicateAlert({ duplicates, txs: newTransactions });
+          setIsProcessing(false);
+          return;
+        }
+      }
 
       await saveOrdersBulkToFirebase(newTransactions);
       onImportOrders(newTransactions);
@@ -331,7 +365,7 @@ export const AiOrderImportModal: React.FC<AiOrderImportModalProps> = ({
             </button>
             <button
               type="button"
-              onClick={handleProcessAndSave}
+              onClick={() => handleProcessAndSave()}
               disabled={parsedRows.length === 0 || isProcessing}
               className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
@@ -351,6 +385,44 @@ export const AiOrderImportModal: React.FC<AiOrderImportModalProps> = ({
         </div>
 
       </div>
+      {duplicateAlert && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <h4 className="text-rose-500 font-bold mb-3 text-lg flex items-center gap-2">
+              <AlertCircle className="w-5 h-5" /> 중복 주문 알림 ({duplicateAlert.duplicates.length}건)
+            </h4>
+            <p className="text-gray-300 text-sm mb-4">
+              아래 건물/호수에 대한 주문이 이미 존재합니다.
+            </p>
+            <ul className="text-xs text-rose-300 mb-6 space-y-1 bg-gray-800 p-3 rounded-lg overflow-y-auto max-h-40 border border-gray-700">
+              {duplicateAlert.duplicates.map((d, i) => <li key={i}>- {d}</li>)}
+            </ul>
+            <p className="text-gray-300 text-sm mb-6 font-bold">
+              계속해서 추가 등록을 진행하시겠습니까?
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button 
+                type="button" 
+                onClick={() => setDuplicateAlert(null)} 
+                className="px-4 py-2.5 bg-gray-700 hover:bg-gray-600 rounded-xl text-white font-semibold text-sm transition"
+              >
+                아니오, 취소할게요
+              </button>
+              <button 
+                type="button" 
+                onClick={() => { 
+                  const txs = duplicateAlert.txs;
+                  setDuplicateAlert(null); 
+                  handleProcessAndSave(true, txs); 
+                }} 
+                className="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 rounded-xl text-white font-bold text-sm shadow-md transition"
+              >
+                네, 추가로 등록합니다
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
