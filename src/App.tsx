@@ -35,6 +35,7 @@ import {
   loadGroupRules,
   saveGroupRules
 } from './lib/storage';
+import { formatRoomDisplay } from './lib/orderParser';
 
 import { Navbar } from './components/Navbar';
 import { AuthScreen } from './components/AuthScreen';
@@ -1241,6 +1242,10 @@ export default function App() {
                       }}
           onResetCollectionsOnly={() => {
                       }}
+          onTransactionsUpdated={(updated) => {
+            setTransactions(updated);
+            saveTransactionsToIndexedDB(updated);
+          }}
         />
       )}
 
@@ -1313,8 +1318,38 @@ export default function App() {
             // Remove wiped flag so sync doesn't clear
             localStorage.removeItem('SAIPON_DATA_INITIALIZED');
 
-            const existingIds = new Set(transactions.map(t => t.id));
-            const newOnes = imported.filter(t => !existingIds.has(t.id));
+            const existingKeys = new Set(
+              transactions.map(t => {
+                const d = normalizeDateStr(t.date || t.businessDate || '');
+                const s = String(t.store || '').replace(/\s+/g, '').toLowerCase();
+                const m = normalizeMarketName(t.market || '', t.room || '');
+                const fl = String(t.floor || '').replace(/층$/, '').trim();
+                const r = formatRoomDisplay(t.room || '');
+                const isDeposit = m === '입금' || m === '미수금' || t.recordType === 'receivable';
+                return isDeposit
+                  ? `deposit|${d}|${s}|${Number(t.expense || 0)}|${Number(t.income || 0)}|${String(t.remark || '').trim()}`
+                  : `order|${d}|${s}|${m}|${fl}|${r}`;
+              })
+            );
+
+            const newOnes: Transaction[] = [];
+            for (const t of imported) {
+              const d = normalizeDateStr(t.date || t.businessDate || '');
+              const s = String(t.store || '').replace(/\s+/g, '').toLowerCase();
+              const m = normalizeMarketName(t.market || '', t.room || '');
+              const fl = String(t.floor || '').replace(/층$/, '').trim();
+              const r = formatRoomDisplay(t.room || '');
+              const isDeposit = m === '입금' || m === '미수금' || t.recordType === 'receivable';
+              const key = isDeposit
+                ? `deposit|${d}|${s}|${Number(t.expense || 0)}|${Number(t.income || 0)}|${String(t.remark || '').trim()}`
+                : `order|${d}|${s}|${m}|${fl}|${r}`;
+
+              if (!existingKeys.has(key)) {
+                existingKeys.add(key);
+                newOnes.push(t);
+              }
+            }
+
             const updated = [...newOnes, ...transactions];
             
             setTransactions(updated);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Transaction } from '../types';
 import { Trash2, AlertTriangle, CheckCircle2, X, Database, Loader2, Layers, FileSpreadsheet, Download, Upload } from 'lucide-react';
-import { factoryResetDatabase, fullSystemReset, deleteOrderFromFirebase } from '../lib/firebase';
+import { factoryResetDatabase, fullSystemReset, cleanupDuplicateOrders } from '../lib/firebase';
 import { saveTransactionsToIndexedDB, saveCollections } from '../lib/storage';
 
 interface DataManagementModalProps {
@@ -14,6 +14,7 @@ interface DataManagementModalProps {
   onRestoreDB: (file: File) => void;
   onResetComplete: () => void;
   onResetCollectionsOnly: () => void;
+  onTransactionsUpdated?: (updated: Transaction[]) => void;
 }
 
 export const DataManagementModal: React.FC<DataManagementModalProps> = ({
@@ -22,6 +23,7 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
   onClose,
   onResetComplete,
   onResetCollectionsOnly,
+  onTransactionsUpdated,
   onExcelImport,
   onExcelExport,
   onBackupDB,
@@ -105,44 +107,21 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
     setLoading(true);
     setStatusMessage(null);
     try {
-      const seen = new Set<string>();
-      const toDelete = [];
-      
-      transactions.forEach(t => {
-        const tDate = t.date || t.businessDate || '';
-        const tStore = (t.store || '').trim();
-        const tMarket = (t.market || '').trim();
-        const tFloor = (t.floor || '').trim();
-        const tRoom = (t.room || '').trim();
-        const tExpense = Number(t.expense) || 0;
-        const tIncome = Number(t.income) || 0;
-        const tRemark = (t.remark || '').trim();
+      const { deletedCount, remainingTransactions } = await cleanupDuplicateOrders(transactions);
 
-        // 중복 판단 시 관리자(manager)는 제외하고 날짜, 상호, 건물, 층, 호수, 금액, 비고가 같으면 중복으로 간주
-        const key = [tDate, tStore, tMarket, tFloor, tRoom, tExpense, tIncome, tRemark].join('|');
-        if (seen.has(key)) {
-          toDelete.push(t);
-        } else {
-          seen.add(key);
-        }
-      });
-
-      let deletedCount = 0;
-      for (const t of toDelete) {
-        if (t.firebaseDate && t.firebaseOrderId) {
-          await deleteOrderFromFirebase(t);
-          deletedCount++;
-        }
+      await saveTransactionsToIndexedDB(remainingTransactions);
+      if (onTransactionsUpdated) {
+        onTransactionsUpdated(remainingTransactions);
       }
 
       setStatusMessage({
         type: 'success',
         text: `총 ${deletedCount}건의 중복 데이터가 성공적으로 정리되었습니다.`
       });
-    } catch (err) {
+    } catch (err: any) {
       setStatusMessage({
         type: 'error',
-        text: `중복 정리 실패: ${err.message}`
+        text: `중복 정리 실패: ${err.message || '알 수 없는 오류'}`
       });
     } finally {
       setLoading(false);

@@ -23,6 +23,7 @@ import {
 import { getDatabase, ref, set, remove, onValue, get, update, push, query, limitToLast, orderByKey } from 'firebase/database';
 import { User, UserRole, Transaction, CollectionGroupRule, CollectionRecord } from '../types';
 import { saveGroupRules } from './storage';
+import { formatRoomDisplay } from './orderParser';
 
 export const FIREBASE_CONFIG = {
   apiKey: 'AIzaSyCKUn8yVyL9V5NP9rpHWbtcDddiwW1MWSQ',
@@ -712,15 +713,156 @@ export async function saveOrderToFirebase(t: Transaction): Promise<string> {
 }
 
 export async function deleteOrderFromFirebase(t: Transaction): Promise<void> {
-  if (!t.firebaseOrderId || !t.firebaseDate) return;
+  const dateKey = t.firebaseDate || normalizeDateStr(t.date || t.businessDate || '');
+  const orderId = t.firebaseOrderId || (t.id?.startsWith('firebase_') ? t.id.split('_').slice(2).join('_') : null);
+  if (!orderId || !dateKey) return;
   try {
     await Promise.race([
-      remove(ref(rtdb, `orders/${t.firebaseDate}/${t.firebaseOrderId}`)),
+      remove(ref(rtdb, `orders/${dateKey}/${orderId}`)),
       new Promise((_, reject) => setTimeout(() => reject(new Error('RTDB Timeout')), 10000))
     ]);
   } catch(e) {
     console.warn('Order delete timeout or offline. Handled in background:', e);
   }
+}
+
+export interface DeduplicateResult {
+  deletedCount: number;
+  remainingTransactions: Transaction[];
+}
+
+export async function cleanupDuplicateOrders(
+  localTransactions: Transaction[]
+): Promise<DeduplicateResult> {
+  const updates: Record<string, any> = {};
+  const seenKeys = new Map<string, { dateKey: string; orderId: string; hasRemark: boolean; hasPayment: boolean }>();
+  let deletedFromFirebaseCount = 0;
+
+  // 1. Scan and deduplicate directly in Firebase Realtime Database
+  try {
+    const ordersRef = ref(rtdb, 'orders');
+    const snapshot = await Promise.race([
+      get(ordersRef),
+      new Promise<any>((_, reject) => setTimeout(() => reject(new Error('RTDB Timeout')), 10000))
+    ]);
+
+    if (snapshot && snapshot.exists()) {
+      const data = snapshot.val() || {};
+      Object.entries(data).forEach(([dateKey, dayOrders]: [string, any]) => {
+        if (dayOrders && typeof dayOrders === 'object') {
+          Object.entries(dayOrders).forEach(([orderId, order]: [string, any]) => {
+            if (!order) return;
+            const normDate = normalizeDateStr(order?.날짜 || dateKey);
+            const normStore = String(order?.상호 || '').replace(/\s+/g, '').toLowerCase();
+            const normMarket = normalizeMarketName(order?.건물명 || '', order?.호수 || '');
+            const normFloor = String(order?.층 || '').replace(/층$/, '').trim();
+            const normRoom = formatRoomDisplay(order?.호수 || '');
+            const payment = Number(order?.대납금 || 0);
+            const income = Number(order?.입금액 || 0);
+            const remark = String(order?.메모 || '').trim();
+
+            // Clear empty orders with no content
+            if (!normStore && payment === 0 && income === 0) {
+              updates[`orders/${dateKey}/${orderId}`] = null;
+              deletedFromFirebaseCount++;
+              return;
+            }
+
+            const isDeposit = normMarket === '입금' || normMarket === '미수금';
+            const key = isDeposit
+              ? `deposit|${normDate}|${normStore}|${payment}|${income}|${remark}`
+              : `order|${normDate}|${normStore}|${normMarket}|${normFloor}|${normRoom}`;
+
+            if (seenKeys.has(key)) {
+              const prev = seenKeys.get(key)!;
+              const currentHasInfo = Boolean(remark) || payment !== 0 || income !== 0;
+              const prevHasInfo = prev.hasRemark || prev.hasPayment;
+
+              // If current item has richer information, delete previous and keep current
+              if (currentHasInfo && !prevHasInfo) {
+                updates[`orders/${prev.dateKey}/${prev.orderId}`] = null;
+                seenKeys.set(key, {
+                  dateKey,
+                  orderId,
+                  hasRemark: Boolean(remark),
+                  hasPayment: payment !== 0 || income !== 0
+                });
+              } else {
+                updates[`orders/${dateKey}/${orderId}`] = null;
+              }
+              deletedFromFirebaseCount++;
+            } else {
+              seenKeys.set(key, {
+                dateKey,
+                orderId,
+                hasRemark: Boolean(remark),
+                hasPayment: payment !== 0 || income !== 0
+              });
+            }
+          });
+        }
+      });
+    }
+  } catch (err) {
+    console.warn('Direct RTDB deduplication fetch warning:', err);
+  }
+
+  // 2. Also deduplicate local transactions array
+  const localSeen = new Set<string>();
+  const remainingTransactions: Transaction[] = [];
+  let localDeletedCount = 0;
+
+  for (const t of localTransactions) {
+    const normDate = normalizeDateStr(t.date || t.businessDate || '');
+    const normStore = String(t.store || '').replace(/\s+/g, '').toLowerCase();
+    const normMarket = normalizeMarketName(t.market || '', t.room || '');
+    const normFloor = String(t.floor || '').replace(/층$/, '').trim();
+    const normRoom = formatRoomDisplay(t.room || '');
+    const payment = Number(t.expense || 0);
+    const income = Number(t.income || 0);
+    const remark = String(t.remark || '').trim();
+
+    if (!normStore && payment === 0 && income === 0) {
+      localDeletedCount++;
+      continue;
+    }
+
+    const isDeposit = normMarket === '입금' || normMarket === '미수금' || t.recordType === 'receivable';
+    const key = isDeposit
+      ? `deposit|${normDate}|${normStore}|${payment}|${income}|${remark}`
+      : `order|${normDate}|${normStore}|${normMarket}|${normFloor}|${normRoom}`;
+
+    if (localSeen.has(key)) {
+      localDeletedCount++;
+      // Ensure it is also queued for deletion in Firebase
+      const targetDate = t.firebaseDate || normDate;
+      const targetId = t.firebaseOrderId || (t.id?.startsWith('firebase_') ? t.id.split('_').slice(2).join('_') : null);
+      if (targetDate && targetId && updates[`orders/${targetDate}/${targetId}`] === undefined) {
+        updates[`orders/${targetDate}/${targetId}`] = null;
+      }
+    } else {
+      localSeen.add(key);
+      remainingTransactions.push(t);
+    }
+  }
+
+  // 3. Commit batch deletion to Firebase RTDB
+  if (Object.keys(updates).length > 0) {
+    try {
+      await Promise.race([
+        update(ref(rtdb), updates),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('RTDB Timeout')), 10000))
+      ]);
+    } catch (e) {
+      console.warn('Batch deletion update error:', e);
+    }
+  }
+
+  const finalDeletedCount = Math.max(deletedFromFirebaseCount, localDeletedCount);
+  return {
+    deletedCount: finalDeletedCount,
+    remainingTransactions
+  };
 }
 
 // ----------------- GROUP RULES FIREBASE SYNC -----------------

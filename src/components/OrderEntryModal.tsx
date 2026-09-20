@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Transaction, User, CollectionGroupRule } from '../types';
-import { saveOrderToFirebase, normalizeMarketName } from '../lib/firebase';
+import { saveOrderToFirebase, normalizeMarketName, normalizeDateStr } from '../lib/firebase';
 import { formatRoomDisplay } from '../lib/orderParser';
 import { SearchWithGroupDropdown } from './SearchWithGroupDropdown';
 import { Plus, Trash2, Edit3, X, Check, Sparkles, AlertCircle } from 'lucide-react';
@@ -56,7 +56,11 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
   const [date, setDate] = useState(editingTransaction?.date || selectedDate);
   const [store, setStore] = useState(editingTransaction?.store || (isMerchant ? currentUser?.storeName || '' : ''));
   const [remark, setRemark] = useState(editingTransaction?.remark || '');
-  const [duplicateAlert, setDuplicateAlert] = useState<string[] | null>(null);
+  const [duplicateAlert, setDuplicateAlert] = useState<{
+    duplicates: string[];
+    nonDuplicates: OrderRowItem[];
+    allRows: OrderRowItem[];
+  } | null>(null);
           
   const [orderRows, setOrderRows] = useState<OrderRowItem[]>(
     isEditMode
@@ -91,19 +95,21 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
 
   const validRows = orderRows.filter(r => r.market.trim() || r.floor.trim() || r.room.trim());
 
-  const handleSubmit = async (e?: React.FormEvent, skipCheck: boolean = false) => {
+  const handleSubmit = async (e?: React.FormEvent, skipCheck: boolean = false, rowsToSubmit?: OrderRowItem[]) => {
     if (e) e.preventDefault();
     if (!date || !store.trim()) {
       alert('날짜와 상호명을 입력해주세요.');
       return;
     }
 
-    if (validRows.length === 0) {
+    const targetRows = rowsToSubmit || validRows;
+
+    if (targetRows.length === 0) {
       alert('주문 내역(건물명, 층, 호수)을 1건 이상 입력해주세요.');
       return;
     }
 
-    for (const r of validRows) {
+    for (const r of targetRows) {
       if (!r.market.trim() || !r.floor.trim() || !r.room.trim()) {
         alert('건물명, 층, 호수를 모두 입력해주세요.');
         return;
@@ -115,21 +121,34 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
     }
 
     if (!isEditMode && !skipCheck) {
-      const duplicates = [];
-      for (const r of validRows) {
+      const duplicates: string[] = [];
+      const nonDuplicates: OrderRowItem[] = [];
+      const normDate = normalizeDateStr(date);
+      const normStore = store.replace(/\s+/g, '').toLowerCase();
+
+      for (const r of targetRows) {
         const normMarket = normalizeMarketName(r.market, r.room);
         const normRoom = formatRoomDisplay(r.room);
+        const normFloor = r.floor.replace(/층$/, '').trim();
         
         const isDuplicate = existingTransactions.some(t => {
-          const tDate = t.date || t.businessDate;
+          const tDate = normalizeDateStr(t.date || t.businessDate || '');
           const tMarket = normalizeMarketName(t.market || '', t.room || '');
           const tRoom = formatRoomDisplay(t.room || '');
-          const tStore = (t.store || '').trim();
+          const tFloor = (t.floor || '').replace(/층$/, '').trim();
+          const tStore = (t.store || '').replace(/\s+/g, '').toLowerCase();
           
-          return tDate === date &&
-                 tStore === store.trim() &&
-                 tMarket === normMarket &&
-                 tRoom === normRoom &&
+          const matchDate = tDate === normDate;
+          const matchStore = tStore === normStore;
+          const matchMarket = tMarket === normMarket;
+          const matchRoom = tRoom === normRoom;
+          const matchFloor = (!normFloor || !tFloor) ? true : (normFloor === tFloor);
+          
+          return matchDate &&
+                 matchStore &&
+                 matchMarket &&
+                 matchFloor &&
+                 matchRoom &&
                  t.recordType !== 'receivable' &&
                  tMarket !== '입금' &&
                  tMarket !== '미수금';
@@ -137,11 +156,17 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
 
         if (isDuplicate) {
           duplicates.push(`${normMarket} ${r.floor} ${normRoom}`);
+        } else {
+          nonDuplicates.push(r);
         }
       }
 
       if (duplicates.length > 0) {
-        setDuplicateAlert(duplicates);
+        setDuplicateAlert({
+          duplicates,
+          nonDuplicates,
+          allRows: targetRows
+        });
         return;
       }
     }
@@ -151,7 +176,7 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
       const savedList: Transaction[] = [];
 
       if (isEditMode && editingTransaction) {
-        const r = validRows[0];
+        const r = targetRows[0];
         const updated: Transaction = {
           ...editingTransaction,
           date,
@@ -174,7 +199,7 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
         await saveOrderToFirebase(updated);
         savedList.push(updated);
       } else {
-        for (const r of validRows) {
+        for (const r of targetRows) {
           const newOrder: Transaction = {
             id: `tx_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
             date,
@@ -473,33 +498,62 @@ export const OrderEntryModal: React.FC<OrderEntryModalProps> = ({
 
       {duplicateAlert && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <h4 className="text-rose-500 font-bold mb-3 text-lg flex items-center gap-2">
-              <AlertCircle className="w-5 h-5" /> 중복 주문 알림 ({duplicateAlert.length}건)
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 max-w-md w-full shadow-2xl relative">
+            <button
+              type="button"
+              onClick={() => setDuplicateAlert(null)}
+              className="absolute top-4 right-4 p-2 text-gray-400 hover:text-white rounded-lg hover:bg-gray-800 transition"
+              aria-label="닫기"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h4 className="text-rose-500 font-bold mb-3 text-lg flex items-center gap-2 pr-8">
+              <AlertCircle className="w-5 h-5 flex-shrink-0" /> 중복 주문 알림 ({duplicateAlert.duplicates.length}건)
             </h4>
-            <p className="text-gray-300 text-sm mb-4">
-              아래 건물/호수에 대한 주문이 이미 존재합니다.
+            <p className="text-gray-300 text-sm mb-3">
+              선택한 날짜(<span className="text-white font-semibold">{normalizeDateStr(date)}</span>)에 동일한 상호(<span className="text-white font-semibold">{store}</span>) 및 매장의 주문이 이미 등록되어 있습니다.
             </p>
-            <ul className="text-xs text-rose-300 mb-6 space-y-1 bg-gray-800 p-3 rounded-lg overflow-y-auto max-h-40 border border-gray-700">
-              {duplicateAlert.map((d, i) => <li key={i}>- {d}</li>)}
+            <ul className="text-xs text-rose-300 mb-4 space-y-1.5 bg-gray-800/80 p-3 rounded-xl overflow-y-auto max-h-40 border border-gray-700">
+              {duplicateAlert.duplicates.map((d, i) => (
+                <li key={i} className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-400 flex-shrink-0" />
+                  <span>{d}</span>
+                </li>
+              ))}
             </ul>
-            <p className="text-gray-300 text-sm mb-6 font-bold">
-              계속해서 추가 등록을 진행하시겠습니까?
-            </p>
-            <div className="flex gap-2 justify-end">
-              <button 
-                type="button" 
-                onClick={() => setDuplicateAlert(null)} 
-                className="px-4 py-2.5 bg-gray-700 hover:bg-gray-600 rounded-xl text-white font-semibold text-sm transition"
+
+            <div className="flex flex-col gap-2 pt-2 border-t border-gray-800">
+              {duplicateAlert.nonDuplicates.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const rows = duplicateAlert.nonDuplicates;
+                    setDuplicateAlert(null);
+                    handleSubmit(undefined, true, rows);
+                  }}
+                  className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-white font-bold text-sm shadow-md transition flex items-center justify-center gap-2"
+                >
+                  <Check className="w-4 h-4" />
+                  중복 제외하고 신규 건만 등록 ({duplicateAlert.nonDuplicates.length}건)
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  const rows = duplicateAlert.allRows;
+                  setDuplicateAlert(null);
+                  handleSubmit(undefined, true, rows);
+                }}
+                className="w-full py-2.5 px-4 bg-amber-600/90 hover:bg-amber-600 rounded-xl text-white font-semibold text-sm transition flex items-center justify-center gap-2"
               >
-                아니오, 취소할게요
+                중복 포함 모두 등록 ({duplicateAlert.allRows.length}건)
               </button>
-              <button 
-                type="button" 
-                onClick={() => { setDuplicateAlert(null); handleSubmit(undefined, true); }} 
-                className="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 rounded-xl text-white font-bold text-sm shadow-md transition"
+              <button
+                type="button"
+                onClick={() => setDuplicateAlert(null)}
+                className="w-full py-2.5 px-4 bg-gray-800 hover:bg-gray-700 rounded-xl text-gray-300 font-medium text-sm transition text-center"
               >
-                네, 추가로 등록합니다
+                취소하고 다시 확인
               </button>
             </div>
           </div>
