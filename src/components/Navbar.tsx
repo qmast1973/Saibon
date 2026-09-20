@@ -162,7 +162,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span>수금관리</span>
               </button>
             )}
-            {(hasAdminAccess || onOpenGroupRules) && (
+            {currentUser && (
               <button
                 type="button"
                 onClick={() => setShowSettings(true)}
