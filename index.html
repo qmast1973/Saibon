@@ -23,8 +23,11 @@
     <script>
       window.deferredPWAInstallPrompt = null;
       window.addEventListener('beforeinstallprompt', (e) => {
-        // e.preventDefault();
+        // Chromium 브라우저에서 기본 미니 인포바/자동 팝업 억제하고 개발자가 원하는 시점에 .prompt() 호출 가능하도록 방지
+        e.preventDefault();
         window.deferredPWAInstallPrompt = e;
+        // 커스텀 이벤트 전파로 리액트 상태 즉각 갱신
+        window.dispatchEvent(new CustomEvent('pwa-prompt-ready', { detail: e }));
       });
     </script>
 </head>
