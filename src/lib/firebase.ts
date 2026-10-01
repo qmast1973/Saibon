@@ -646,7 +646,9 @@ export function syncFirebaseOrders(onOrdersUpdate: (orders: Transaction[]) => vo
             room: String(order?.호수 || ''),
             itemCount: Number(order?.수량 ?? 0),
             isReturn: Boolean(order?.반품여부),
-            expense: isPayment ? -Math.abs(payment) : payment,
+            // 입금 건은 저장 시 대납금(-금액)과 입금액(+금액)이 함께 기록되므로,
+            // 입금액이 있으면 그것만 사용해 화면 합계에서 두 번 더해지지 않도록 함
+            expense: isPayment ? (income !== 0 ? 0 : -Math.abs(payment)) : payment,
             income,
             status: String(order?.완료여부 || '') === '미완료' ? '' : String(order?.완료여부 || ''),
             remark: String(order?.메모 || ''),

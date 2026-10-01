@@ -149,7 +149,9 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = React.memo(({
       
       const isOrder = normalizeMarketName(t.market || '') !== '입금' && normalizeMarketName(t.market || '') !== '미수금';
       if (isOrder && (t._expense > 0 || (t._expense === 0 && t._income === 0))) {
-        if ((t.status || '').trim() !== '') {
+        // 거래처별 합계와 동일하게 사입비 제외/포함 수동 전환(isFeeExcluded/isFeeIncluded)을 반영
+        const hasStatus = (t.status || '').trim() !== '';
+        if ((hasStatus && !t.isFeeExcluded) || !!t.isFeeIncluded) {
           map.get(key)!.completedCount += 1;
         }
       }

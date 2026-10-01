@@ -258,7 +258,19 @@ export function saveCollections(records: CollectionRecord[]): void {
 export function loadGroupRules(): CollectionGroupRule[] {
   try {
     const saved = localStorage.getItem(GROUP_RULES_STORAGE_KEY);
-    return saved ? JSON.parse(saved) : [];
+    const parsed = saved ? JSON.parse(saved) : [];
+    if (!Array.isArray(parsed)) return [];
+    // 예전 버전에서 저장된 불완전한 규칙(상호/대표명 누락)으로 화면이 멈추지 않도록 정리
+    return parsed
+      .filter((r: any) => r && (r.storeName || r.groupName))
+      .map((r: any) => ({
+        ...r,
+        id: String(r.id || ''),
+        storeName: String(r.storeName || '').trim(),
+        groupName: String(r.groupName || '').trim(),
+        matchType: r.matchType === 'prefix' ? 'prefix' : 'exact',
+        effectiveFrom: String(r.effectiveFrom || '').trim()
+      }));
   } catch {
     return [];
   }

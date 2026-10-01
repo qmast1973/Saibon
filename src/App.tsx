@@ -865,7 +865,7 @@ export default function App() {
         }
 
         if (confirm('현재 DB를 백업 파일 내용으로 복원하시겠습니까?')) {
-          setTransactions(payload.transactions);
+          setCleanTransactions(payload.transactions);
           await saveTransactionsToIndexedDB(payload.transactions);
           await saveOrdersBulkToFirebase(payload.transactions);
 
@@ -1179,7 +1179,9 @@ export default function App() {
           currentUser={currentUser}
           existingTransactions={roleFilteredTransactions}
           onImportOrders={(orders) => {
-            setCleanTransactions([...transactions, ...orders]);
+            const merged = cleanTransactions([...transactions, ...orders]);
+            setTransactions(merged);
+            saveTransactionsToIndexedDB(merged).catch(console.warn);
           }}
         />
       )}
