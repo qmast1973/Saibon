@@ -69,10 +69,14 @@ const MARKET_ALIASES: Record<string, string> = {
   'apm': 'APM',
   '럭스': 'APM럭스',
   'apm럭스': 'APM럭스',
+  'apmluxe': 'APM럭스',
   '플레이스': 'APM플레이스',
   'apm플레이스': 'APM플레이스',
+  'apmplace': 'APM플레이스',
   'd': '디자이너',
   '디자이너': '디자이너',
+  '디자이너클럽': '디자이너',
+  '디클': '디자이너',
   '뉴존': '누죤',
   '누죤': '누죤',
   '누': '누죤',
@@ -80,6 +84,7 @@ const MARKET_ALIASES: Record<string, string> = {
   'ddp': '유어스',
   '유': '유어스',
   '유어스': '유어스',
+  'ddp패션몰': '유어스',
   '팀': '팀204',
   '204': '팀204',
   '팀204': '팀204',
@@ -103,6 +108,7 @@ const MARKET_ALIASES: Record<string, string> = {
   '퀸즈스퀘어': '퀸즈스퀘어',
   '광': '광희',
   '광희': '광희',
+  '광희패션몰': '광희',
   '벨포': '벨포스트',
   '벨포스트': '벨포스트',
   '아트': '아트프라자',
@@ -111,6 +117,8 @@ const MARKET_ALIASES: Record<string, string> = {
   'w': '스튜디오 더블유',
   '스튜디오': '스튜디오 더블유',
   '스튜디오더블유': '스튜디오 더블유',
+  '스튜디오w': '스튜디오 더블유',
+  'studiow': '스튜디오 더블유',
   '혜': '혜양',
   '혜양': '혜양',
   '테': '테크노',
@@ -141,7 +149,7 @@ export function normalizeMarketName(value: string | undefined, room: string = ''
   
   // "디" / "d" 매직 변환 로직 (호수에 따라 디오트/디자이너 구분)
   if (raw === '디' || raw === 'd' || raw === '디오트' || raw === '디자이너') {
-    const cleanRoom = room.replace(/호/g, '').trim();
+    const cleanRoom = String(room ?? '').replace(/호/g, '').trim();
     if (cleanRoom) {
       if (/[a-zA-Z가-힣]/.test(cleanRoom)) {
         return '디오트';
@@ -667,7 +675,7 @@ export async function saveOrderToFirebase(t: Transaction): Promise<string> {
   }
 
   const market = normalizeMarketName(t.market || '');
-  const finalPayment = market === '입금' ? -Math.abs(Number(t.expense || t.income || 0)) : payment;
+  const finalPayment = market === '입금' ? -Math.abs(Number(t.income || t.expense || 0)) : payment;
 
   const payload = {
     날짜: date,
@@ -1177,7 +1185,7 @@ export async function saveOrdersBulkToFirebase(transactions: Transaction[]): Pro
       }
 
       const market = normalizeMarketName(t.market || '');
-      const payment = market === '입금' ? -Math.abs(Number(t.expense || t.income || 0)) : rawExpense;
+      const payment = market === '입금' ? -Math.abs(Number(t.income || t.expense || 0)) : rawExpense;
       const firebaseId = t.firebaseOrderId || `order_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       
       const payload = {
@@ -1259,7 +1267,7 @@ export function subscribeToBoardPosts(callback: (posts: any[]) => void): () => v
         posts.push({ id: child.key, ...child.val() });
       });
     }
-    callback(posts.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+    callback(posts.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''))));
   });
   return unsubscribe;
 }

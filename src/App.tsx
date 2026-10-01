@@ -323,7 +323,7 @@ export default function App() {
     }
 
     const allowedMarkets = (currentUser?.role === 'buyer' && currentUser.allowedMarkets)
-      ? new Set((currentUser.allowedMarkets || []).map(normalizeMarketName))
+      ? new Set((currentUser.allowedMarkets || []).map(m => normalizeMarketName(m)))
       : null;
 
     let assignedUsernames: string[] = [];
@@ -556,14 +556,12 @@ export default function App() {
       saveTransactionsToIndexedDB(updated).catch(console.warn);
       return updated;
     });
-    if (currentUser?.isFirebaseLinked) {
-      try {
-        await saveOrderToFirebase(updatedTx);
-      } catch (e) {
-        console.warn('Firebase sync error on update:', e);
-      }
+    try {
+      await saveOrderToFirebase(updatedTx);
+    } catch (e) {
+      console.warn('Firebase sync error on update:', e);
     }
-  }, [currentUser?.isFirebaseLinked]);
+  }, []);
 
   const handleToggleComplete = useCallback(async (id: string) => {
     let targetTx: Transaction | undefined;
@@ -675,10 +673,8 @@ export default function App() {
     });
     
     // Defer the firebase sync to not block
-    if (currentUser?.isFirebaseLinked) {
-      saveOrdersBulkToFirebase(newTxs).catch(console.error);
-    }
-  }, [currentUser?.isFirebaseLinked]);
+    saveOrdersBulkToFirebase(newTxs).catch(console.error);
+  }, []);
 
   // Excel Handlers
   const handleExcelExport = () => {
@@ -1199,7 +1195,7 @@ export default function App() {
             setShowAiModal(true);
           }}
           stores={stores}
-          allMarkets={currentUser?.role === 'buyer' && !currentUser.isBuyerAdmin ? (currentUser.allowedMarkets || []).map(normalizeMarketName) : allMarkets}
+          allMarkets={currentUser?.role === 'buyer' && !currentUser.isBuyerAdmin ? (currentUser.allowedMarkets || []).map(m => normalizeMarketName(m)) : allMarkets}
           bundledStores={merchantBundledStores}
           collectionGroupRules={collectionGroupRules}
           onClose={() => {

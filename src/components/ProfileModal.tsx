@@ -45,7 +45,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [phone, setPhone] = useState(user?.phone || '');
   const [approved, setApproved] = useState(user?.approved ?? false);
   const [isBuyerAdmin, setIsBuyerAdmin] = useState(user?.isBuyerAdmin ?? false);
-  const [allowedMarkets, setAllowedMarkets] = useState<string[]>((user?.allowedMarkets || []).map(normalizeMarketName));
+  const [allowedMarkets, setAllowedMarkets] = useState<string[]>((user?.allowedMarkets || []).map(m => normalizeMarketName(m)));
   const [assignedMerchants, setAssignedMerchants] = useState<string[]>(user?.assignedMerchants || []);
   const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -64,7 +64,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       setPhone(user.phone || '');
       setApproved(user.approved ?? false);
       setIsBuyerAdmin(user.isBuyerAdmin ?? false);
-      setAllowedMarkets((user.allowedMarkets || []).map(normalizeMarketName));
+      setAllowedMarkets((user.allowedMarkets || []).map(m => normalizeMarketName(m)));
       setAssignedMerchants(user.assignedMerchants || []);
     }
   }, [user]);
@@ -74,7 +74,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   // Occupied market map for buyer assignments
   const occupiedMarkets = new Map<string, string[]>();
   users.filter(u => u.role === 'buyer' && u.username !== user.username).forEach(u => {
-    (u.allowedMarkets || []).map(normalizeMarketName).filter(Boolean).forEach(m => {
+    (u.allowedMarkets || []).map(m => normalizeMarketName(m)).filter(Boolean).forEach(m => {
       if (!occupiedMarkets.has(m)) occupiedMarkets.set(m, []);
       occupiedMarkets.get(m)!.push(u.name || u.username);
     });

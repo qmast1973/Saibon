@@ -18,7 +18,8 @@ export interface ParsedOrderItem {
 export const MARKET_DICTIONARY: { canonical: string; aliases: string[] }[] = [
   { canonical: '디오트', aliases: ['디오트', '디오', '디', 'THEOT', 'THE OT', 'DEOT'] },
   { canonical: 'APM플레이스', aliases: ['APM플레이스', 'APM 플레이스', '에이피엠플레이스', '에플', '에이플', '플레이스', 'APM PLACE', 'APM P', 'APMP', '플스'] },
-  { canonical: 'APM', aliases: ['APM', '에이피엠', '에펨', 'APM LUXE', '럭스', 'APM럭스'] },
+  { canonical: 'APM럭스', aliases: ['APM럭스', 'APM 럭스', 'APM LUXE', 'APMLUXE', '럭스'] },
+  { canonical: 'APM', aliases: ['APM', '에이피엠', '에펨'] },
   { canonical: '청평화', aliases: ['청평화', '청평', '청', 'CPH', 'CHEONGPYEONGHWA'] },
   { canonical: '퀸즈스퀘어', aliases: ['퀸즈스퀘어', '퀸즈', '퀸', 'QUEENS', 'QUEENSSQUARE'] },
   { canonical: '디자이너클럽', aliases: ['디자이너클럽', '디자이너', '디클', 'DC', 'DESIGNER', 'D'] },
@@ -242,7 +243,10 @@ export function parseSmartOrderText(
           .replace(/^[\[★■▶◆\*●📍📌🏷️🏢🏪\s]+|[\]★■▶◆\*●\s]+$/g, '')
           .replace(/^(?:소매명|소매상호|소매점|소매처|소매|상호명|상호|고객사|매장명)\s*[:：]?\s*/, '')
           .trim();
-        if (cleanStoreName && !matchMarketName(cleanStoreName)) {
+        // "디 f10", "청 2-15" 처럼 첫 단어가 건물 약어이고 뒤에 호수가 오는 줄은 상호가 아니라 주문으로 처리
+        const [firstToken, ...restTokens] = cleanStoreName.split(/\s+/);
+        const looksLikeOrderLine = restTokens.length > 0 && !!matchMarketName(firstToken, true) && /\d/.test(restTokens.join(' '));
+        if (cleanStoreName && !looksLikeOrderLine && !matchMarketName(cleanStoreName)) {
           currentGroupStore = cleanStoreName;
           continue;
         }
@@ -389,6 +393,11 @@ export function parseSmartOrderText(
       // 층/호수에 매칭된 단어들을 남은 텍스트에서 제거
       const cleanedRest = restText.replace(frResult.matchedText, ' ').trim();
       remainingTokens = cleanedRest.split(/\s+/).filter(Boolean);
+    }
+
+    // B-2. 층/호수 패턴이 없지만 건물명 바로 뒤에 호수 코드만 단독으로 온 경우 (예: "디 f10", "디오트 가-10")
+    if (!frResult && detectedMarket && remainingTokens.length > 0 && /^[A-Za-z가-힣]-?\d{1,4}호?$/.test(remainingTokens[0])) {
+      detectedRoom = remainingTokens.shift() as string;
     }
 
     // A-2. 만약 A단계에서 건물명을 못 찾았다면, B단계에서 층/호수를 지운 나머지 텍스트로 다시 한 번 건물명(특히 1글자 영문 약어) 탐색
