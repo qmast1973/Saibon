@@ -19,7 +19,7 @@ type StatusFilter = '' | '미처리' | '완료' | '미수';
 
 /** 수금관리: 날짜별로 거래처(대표 기준) 청구 · 입금 · 미수를 보고 수금을 입력 */
 export function CollectionScreen({ nav }: { nav: Nav }) {
-  const { user, users, rules, visibleOrders, includeFee, showFeeWaive, markets, saveOrders, patchOrderLocal, deleteOrder, saveStoreOrder, notify } = useApp();
+  const { user, users, rules, visibleOrders, feeOnAt, showFeeWaive, markets, saveOrders, patchOrderLocal, deleteOrder, saveStoreOrder, notify } = useApp();
   const [storeQuery, setStoreQuery] = useState('');
   const [buyer, setBuyer] = useState('');
   const [status, setStatus] = useState<StatusFilter>('');
@@ -36,9 +36,10 @@ export function CollectionScreen({ nav }: { nav: Nav }) {
   const { rows: olderVisible } = useOlderOrders(true);
 
   const carry = useMemo(
-    () => computeCarryOver([...olderVisible, ...visibleOrders], nav.date, { rules, users, includeFee, markets }),
-    [olderVisible, visibleOrders, nav.date, rules, users, includeFee, markets],
+    () => computeCarryOver([...olderVisible, ...visibleOrders], nav.date, { rules, users, includeFee: feeOnAt, markets }),
+    [olderVisible, visibleOrders, nav.date, rules, users, feeOnAt, markets],
   );
+  const includeFee = feeOnAt(nav.date); // 보고 있는 날짜에 사입비를 받는지
   const allGroups = useMemo(() => buildStoreGroups(dayRows, { mode: 'collection', rules, users, includeFee, carry, markets }), [dayRows, rules, users, includeFee, carry, markets]);
 
   // 필터가 걸려 있으면 그 조건에 맞는 거래처의 이월만 보여 준다 (이월 거래처는 오늘 주문이 없어 담당·처리 상태를 알 수 없다)
@@ -211,7 +212,7 @@ function CollectionEntryModal({
     const depositAmount = Number(deposit) || 0;
     const cashAmount = Number(cash) || 0;
     if (!store.trim()) return notify('거래처를 입력해주세요.', 'error');
-    if (depositAmount <= 0 && cashAmount <= 0) return notify('입금액 또는 수금액을 입력해주세요.', 'error');
+    const missed = depositAmount <= 0 && cashAmount <= 0; // 0원: 수금하러 갔지만 못 받은 경우도 기록으로 남긴다
 
     const make = (amount: number, label: string): Transaction => ({
       id: '',
@@ -231,6 +232,10 @@ function CollectionEntryModal({
     });
     const memo = note.trim();
     const list: Transaction[] = [];
+    if (missed) {
+      const time = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+      list.push(make(0, `수금 못함 (${time})${memo ? ` - ${memo}` : ''}`));
+    }
     if (depositAmount > 0) list.push(make(depositAmount, `수금 (온라인입금${memo ? ` - ${memo}` : ''})`));
     if (cashAmount > 0) list.push(make(cashAmount, memo ? `수금 (${memo})` : '수금'));
 
@@ -238,7 +243,7 @@ function CollectionEntryModal({
     setSaving(true);
     try {
       addOrdersFast(list);
-      notify(`${store} 수금 ${formatMoney(depositAmount + cashAmount)}을 저장했습니다.`, 'success');
+      notify(missed ? `${store} 수금 못함으로 기록했습니다.` : `${store} 수금 ${formatMoney(depositAmount + cashAmount)}을 저장했습니다.`, 'success');
       onClose();
     } catch (err) {
       notify(err instanceof Error ? err.message : '저장하지 못했습니다.', 'error');
@@ -248,7 +253,7 @@ function CollectionEntryModal({
 
   return (
     <Modal title="수금 입력" subtitle={`${entryDate} 기준`} icon={<HandCoins className="h-5 w-5 text-emerald-400" />} onClose={onClose}
-      footer={<><Button onClick={onClose}>취소</Button><Button tone="success" type="submit" form="collection-form" disabled={saving}>{saving ? '저장 중...' : '수금 저장'}</Button></>}
+      footer={<><Button onClick={onClose}>취소</Button><Button tone="success" type="submit" form="collection-form" disabled={saving}>{saving ? '저장 중...' : (Number(deposit) || 0) <= 0 && (Number(cash) || 0) <= 0 ? '수금 못함 기록' : '수금 저장'}</Button></>}
     >
       <form id="collection-form" onSubmit={submit} className="space-y-3.5">
         <div className="flex items-center justify-between rounded-xl border border-indigo-900 bg-indigo-950/50 p-3">
@@ -309,6 +314,9 @@ function CollectionEntryModal({
           </p>
         </div>
 
+        <p className="rounded-lg bg-gray-950 px-3 py-2 text-xs text-gray-300">
+          금액을 모두 0원으로 두고 저장하면 <b className="text-amber-300">"수금 못함"</b>으로 기록이 남습니다. (수금하러 갔지만 받지 못한 경우)
+        </p>
         <Field label="담당 (수금 등록자)">
           <Input value={manager} disabled />
         </Field>
