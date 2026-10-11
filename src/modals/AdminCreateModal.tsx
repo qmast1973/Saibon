@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { ShieldCheck } from 'lucide-react';
-import { createEmailAccountForOther, emailKey, fetchUsers, freeKey, isPermissionDenied, nicknameTaken, sha256, userKey } from '../data/users';
+import { createEmailAccountForOther, emailKey, fetchUsers, freeKey, isPermissionDenied, nicknameTaken, userKey, checkEmailPassword } from '../data/users';
 import { useApp } from '../state/AppContext';
 import { Button, Field, Input, LoginIdInput, Modal, PasswordInput } from '../components/ui';
 
@@ -41,7 +41,7 @@ export function AdminCreateModal({ onClose }: { onClose: () => void }) {
       const admins = users.filter(u => u.role === 'admin');
       if (admins.length > 0 && !loggedInAdmin) {
         const admin = admins.find(u => userKey(u.username) === userKey(form.authId) || String(u.email || '').toLowerCase() === userKey(form.authId));
-        if (!admin || admin.passwordHash !== (await sha256(form.authPw))) throw new Error('기존 관리자 이메일 또는 비밀번호가 올바르지 않습니다.');
+        if (!admin?.email || !(await checkEmailPassword(admin.email, form.authPw))) throw new Error('기존 관리자 이메일 또는 비밀번호가 올바르지 않습니다.');
       }
       if (nicknameTaken(users, nickname)) throw new Error('이미 사용 중인 닉네임입니다.');
       const username = freeKey(emailKey(email), users); // 내부 고유키 (이메일 앞부분)
@@ -55,7 +55,6 @@ export function AdminCreateModal({ onClose }: { onClose: () => void }) {
         name: form.name.trim(),
         email,
         phone: form.phone.trim(),
-        passwordHash: await sha256(form.pw),
         role: 'admin',
         approved: true,
         createdAt: new Date().toISOString(),
@@ -84,7 +83,7 @@ export function AdminCreateModal({ onClose }: { onClose: () => void }) {
         )}
         <Field label="이름 *"><Input required value={form.name} onChange={e => set('name')(e.target.value)} placeholder="관리자 이름" /></Field>
         <div className="grid grid-cols-2 gap-2">
-          <Field label="이메일 *"><Input type="email" required value={form.email} onChange={e => set('email')(e.target.value)} placeholder="로그인에 쓸 이메일" /></Field>
+          <Field label="이메일 *" hint="실제로 쓰는 이메일을 입력하세요. 없는 이메일이면 비밀번호를 잊어버렸을 때 복구할 수 없습니다."><Input type="email" required value={form.email} onChange={e => set('email')(e.target.value)} placeholder="로그인에 쓸 이메일" /></Field>
           <Field label="전화번호"><Input type="tel" value={form.phone} onChange={e => set('phone')(e.target.value)} placeholder="선택" /></Field>
         </div>
         <Field label="닉네임 * (2~12자)"><Input required minLength={2} maxLength={12} value={form.id} onChange={e => set('id')(e.target.value)} autoComplete="off" /></Field>
